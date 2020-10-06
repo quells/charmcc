@@ -1,4 +1,4 @@
-CFLAGS=-std=c90 -g -fno-common
+CFLAGS=-std=c99 -g -fno-common
 
 charmcc: main.o
 	$(CC) -o charmcc main.o $(LDFLAGS)
