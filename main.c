@@ -29,7 +29,7 @@ struct Token {
 // Input string
 static char *current_input;
 
-// Reports an error an exits.
+// Reports an error and exits.
 static void error(char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -248,6 +248,7 @@ static Node *primary(Token **rest, Token *tok) {
     }
 
     error_tok(tok, "expected an expression");
+    return NULL;
 }
 
 /*------------
@@ -317,6 +318,8 @@ static void gen_expr(Node *node) {
         gen_expr(node->lhs);
         printf("  neg   r0, r0\n");
         return;
+    default:
+        break;
     }
 
     gen_expr(node->rhs);
@@ -337,6 +340,8 @@ static void gen_expr(Node *node) {
     case ND_DIV:
         printf("  bl    div\n");
         return;
+    default:
+        break;
     }
 
     error("invalid expression");
