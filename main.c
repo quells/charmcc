@@ -92,6 +92,10 @@ static Token *new_token(TokenKind kind, char *start, char *end) {
     return tok;
 }
 
+static bool startswith(char *p, char *q) {
+    return strncmp(p, q, strlen(q)) == 0;
+}
+
 // Create linked list of tokens from program source.
 static Token *tokenize(void) {
     char *p = current_input;
@@ -115,6 +119,12 @@ static Token *tokenize(void) {
         }
 
         // Punctuation
+        if (startswith(p, "==") || startswith(p, "!=") ||
+            startswith(p, "<=") || startswith(p, ">=")) {
+            cur = cur->next = new_token(TK_RESERVED, p, p+2);
+            p += 2;
+            continue;
+        }
         if (ispunct(*p)) {
             cur = cur->next = new_token(TK_RESERVED, p, p+1);
             p++;
@@ -138,6 +148,10 @@ typedef enum {
     ND_MUL, // *
     ND_DIV, // /
     ND_NEG, // unary -
+    ND_EQ,  // ==
+    ND_NEQ, // !=
+    ND_LT,  // <
+    ND_LTE, // <=
     ND_NUM, // Integer
 } NodeKind;
 
@@ -175,12 +189,70 @@ static Node *new_num(int val) {
 }
 
 static Node *expr(Token **rest, Token *tok);
+static Node *equality(Token **rest, Token *tok);
+static Node *relational(Token **rest, Token *tok);
+static Node *add(Token **rest, Token *tok);
 static Node *mul(Token **rest, Token *tok);
 static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
 
-// expr :: mul ("+" mul | "-" mul)*
+// expr :: equality
 static Node *expr(Token **rest, Token *tok) {
+    return equality(rest, tok);
+}
+
+// equality :: relational ("==" relational | "!=" relational)*
+static Node *equality(Token **rest, Token *tok) {
+    Node *node = relational(&tok, tok);
+
+    for (;;) {
+        if (equal(tok, "==")) {
+            node = new_binary(ND_EQ, node, relational(&tok, tok->next));
+            continue;
+        }
+
+        if (equal(tok, "!=")) {
+            node = new_binary(ND_NEQ, node, relational(&tok, tok->next));
+            continue;
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+// relational :: add ("<" add | "<=" add | ">" add | ">=" add)*
+static Node *relational(Token **rest, Token *tok) {
+    Node *node = add(&tok, tok);
+
+    for (;;) {
+        if (equal(tok, "<")) {
+            node = new_binary(ND_LT, node, add(&tok, tok->next));
+            continue;
+        }
+
+        if (equal(tok, "<=")) {
+            node = new_binary(ND_LTE, node, add(&tok, tok->next));
+            continue;
+        }
+
+        if (equal(tok, ">")) {
+            node = new_binary(ND_LT, add(&tok, tok->next), node);
+            continue;
+        }
+
+        if (equal(tok, ">=")) {
+            node = new_binary(ND_LTE, add(&tok, tok->next), node);
+            continue;
+        }
+
+        *rest = tok;
+        return node;
+    }
+}
+
+// add :: mul ("+" mul | "-" mul)*
+static Node *add(Token **rest, Token *tok) {
     Node *node = mul(&tok, tok);
 
     for (;;) {
@@ -340,6 +412,36 @@ static void gen_expr(Node *node) {
     case ND_DIV:
         printf("  bl    div\n");
         return;
+    case ND_EQ:
+    case ND_NEQ:
+    case ND_LT:
+    case ND_LTE:
+        printf("  cmp   r0, r1\n"); // carry set if rhs - lhs is positive
+        switch (node->kind) {
+        case ND_EQ:
+            printf(
+                "  moveq r0, #1\n"
+                "  movne r0, #0\n");
+            break;
+        case ND_NEQ:
+            printf(
+                "  movne r0, #1\n"
+                "  moveq r0, #0\n");
+            break;
+        case ND_LT:
+            printf(
+                "  movlt r0, #1\n"
+                "  movge r0, #0\n");
+            break;
+        case ND_LTE:
+            printf(
+                "  movle r0, #1\n"
+                "  movgt r0, #0\n");
+            break;
+        default:
+            break;
+        }
+        return;
     default:
         break;
     }
@@ -386,7 +488,7 @@ static void gen_div(void) {
         "  lslls r3, r3, #1\n"
         "  bls   div_shift\n"
         "div_sub:\n"
-        // cmp sets the carry flag if the r1 - r2 is positive, which is weird
+        // cmp sets the carry flag if r1 - r2 is positive, which is weird
         "  cmp   r1, r2\n"
         // subtract divisor from the remainder if it was smaller
         // this also sets the carry flag since the result is positive
