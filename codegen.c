@@ -122,6 +122,15 @@ static void gen_expr(Node *node) {
     error("invalid expression");
 }
 
+static void gen_stmt(Node *node) {
+    if (node->kind == ND_EXPR_STMT) {
+        gen_expr(node->lhs);
+        return;
+    }
+
+    error("invalid statement");
+}
+
 /*
 Generate a subroutine for integer division.
 
@@ -187,13 +196,16 @@ void codegen(Node *node) {
         "main:\n"
         "  push  {fp, lr}\n"
         "  add   fp, sp, #4\n");
-    gen_expr(node);
+
+    for (Node *n = node; n; n = n->next) {
+        gen_stmt(n);
+        assert(depth == 0);
+    }
+
     printf(
         "  sub   sp, fp, #4\n"
         "  pop   {fp, lr}\n"
         "  bx    lr\n");
-
-    assert(depth == 0);
 
     if (contains(node, ND_DIV)) {
         gen_div();

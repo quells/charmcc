@@ -48,11 +48,13 @@ typedef enum {
     ND_LT,  // <
     ND_LTE, // <=
     ND_NUM, // Integer
+    ND_EXPR_STMT,
 } NodeKind;
 
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
+    Node *next;
     Node *lhs;
     Node *rhs;
     int val;  // Only if kind == ND_NUM
