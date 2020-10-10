@@ -92,6 +92,13 @@ Token *tokenize(char *p) {
             continue;
         }
 
+        // Identifier
+        if ('a' <= *p && *p <= 'z') {
+            cur = cur->next = new_token(TK_IDENT, p, p+1);
+            p++;
+            continue;
+        }
+
         // Punctuation
         if (startswith(p, "==") || startswith(p, "!=") ||
             startswith(p, "<=") || startswith(p, ">=")) {

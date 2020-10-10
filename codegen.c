@@ -54,6 +54,18 @@ static int contains(Node *node, NodeKind kind) {
     return contains(node->lhs, kind) || contains(node->rhs, kind);
 }
 
+// Compute absolute address of a node.
+// It's an error if a given node does not reside in memory.
+static void gen_addr(Node *node) {
+    if (node->kind == ND_VAR) {
+        int offset = (node->name - 'a' + 1) * 8;
+        printf("  str   r0, [fp, #-%d]\n", offset);
+        return;
+    }
+
+    error("not an lvalue");
+}
+
 static void gen_expr(Node *node) {
     switch (node->kind) {
     case ND_NUM:
@@ -114,6 +126,17 @@ static void gen_expr(Node *node) {
         default:
             break;
         }
+        return;
+    case ND_VAR:
+        gen_addr(node);
+        printf("  mov   r0, [r0]\n");
+        return;
+    case ND_ASSIGN:
+        gen_addr(node->lhs);
+        push();
+        gen_expr(node->rhs);
+        pop("r1");
+        printf("  ldr   r0, [r1]\n");
         return;
     default:
         break;
@@ -195,7 +218,8 @@ void codegen(Node *node) {
         ".global main\n\n"
         "main:\n"
         "  push  {fp, lr}\n"
-        "  add   fp, sp, #4\n");
+        "  add   fp, sp, #4\n"
+        "  sub   sp, sp, #208\n");
 
     for (Node *n = node; n; n = n->next) {
         gen_stmt(n);
