@@ -1,5 +1,8 @@
 #include "charmcc.h"
 
+// All local variable instances found during parsing.
+Obj *locals;
+
 static Node *new_node(NodeKind kind) {
     Node *node = calloc(1, sizeof(Node));
     node->kind = kind;
@@ -19,10 +22,18 @@ static Node *new_unary(NodeKind kind, Node *expr) {
     return node;
 }
 
-static Node *new_var(char name) {
+static Node *new_var(Obj *var) {
     Node *node = new_node(ND_VAR);
-    node->name = name;
+    node->var = var;
     return node;
+}
+
+static Obj *new_lvar(char *name) {
+    Obj *var = calloc(1, sizeof(Obj));
+    var->name = name;
+    var->next = locals;
+    locals = var;
+    return var;
 }
 
 static Node *new_num(int val) {
@@ -40,6 +51,17 @@ static Node *add(Token **rest, Token *tok);
 static Node *mul(Token **rest, Token *tok);
 static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
+
+// Find local variable by name.
+static Obj *find_var(Token *tok) {
+    for (Obj *var = locals; var; var = var->next) {
+        if (strlen(var->name) == tok->len &&
+            strncmp(tok->loc, var->name, tok->len)) {
+            return var;
+        }
+        return NULL;
+    }
+}
 
 // stmt :: expr-stmt
 static Node *stmt(Token **rest, Token *tok) {
@@ -183,9 +205,12 @@ static Node *primary(Token **rest, Token *tok) {
     }
 
     if (tok->kind == TK_IDENT) {
-        Node *node = new_var(*tok->loc);
+        Obj *var = find_var(tok);
+        if (!var) {
+            var = new_lvar(strndup(tok->loc, tok->len));
+        }
         *rest = tok->next;
-        return node;
+        return new_var(var);
     }
 
     if (tok->kind == TK_NUM) {
@@ -199,11 +224,16 @@ static Node *primary(Token **rest, Token *tok) {
 }
 
 // program :: stmt*
-Node *parse(Token *tok) {
+Function *parse(Token *tok) {
     Node head = {};
     Node *cur = &head;
+
     while (tok->kind != TK_EOF) {
         cur = cur->next = stmt(&tok, tok);
     }
-    return head.next;
+
+    Function *prog = calloc(1, sizeof(Function));
+    prog->body = head.next;
+    prog->locals = locals;
+    return prog;
 }

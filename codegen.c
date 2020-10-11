@@ -2,37 +2,6 @@
 
 static int depth;
 
-/*
-Generate a function prologue.
-
-Pushes the frame pointer and return address onto the stack,
-sets up the new frame pointer relative to the stack pointer,
-then allocates some stack buffer.
-
-The amount of buffer is 4 + 4*reg_count, since each register takes up 4 bytes.
-Registers are saved starting with r0 at [fp, #-8] and extending downwards.
-*/
-static void gen_prologue(int reg_count) {
-    int buf = 4 + 4*reg_count;
-    printf(
-        "  push  {fp, lr}\n"
-        "  add   fp, sp, #4\n"
-        "  sub   sp, sp, #%d\n", buf);
-    for (int i = 0; i < reg_count; i++) {
-        printf("  str   r%d, [fp, #-%d]\n", i, 8 + 4*i);
-    }
-}
-
-/*
-Generate a function epilogue.
-Restores the stack to the beginning of the frame, pops the previous frame pointer, and returns to the caller.
-*/
-static void gen_epilogue(void) {
-    printf(
-        "  sub   sp, fp, #4\n"
-        "  pop   {fp, pc}\n");
-}
-
 static void push(void) {
     printf("  push  {r0}\n");
     depth++;
@@ -41,6 +10,14 @@ static void push(void) {
 static void pop(char *arg) {
     printf("  pop   {%s}\n", arg);
     depth--;
+}
+
+/*
+Round up `n` to the nearest multiple of `align`.
+For example, align_to(5, 8) == 8 and align_to(11, 8) == 16.
+*/
+static int align_to(int n, int align) {
+    return (n + align - 1) / align * align;
 }
 
 // Check if the AST contains a node of kind.
@@ -61,8 +38,7 @@ static int contains(Node *node, NodeKind kind) {
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
     if (node->kind == ND_VAR) {
-        int offset = (node->name - 'a' + 1) * 8;
-        printf("  sub   r0, fp, #%d\n", offset);
+        printf("  sub   r0, fp, #%d @ gen_addr %s\n", node->var->offset, node->var->name);
         return;
     }
 
@@ -79,15 +55,17 @@ static void gen_expr(Node *node) {
         printf("  neg   r0, r0\n");
         return;
     case ND_VAR:
+        printf("@ gen_expr ND_VAR\n");
         gen_addr(node);
-        printf("  ldr   r0, [r0]\n");
+        printf("  ldr   r0, [r0] @ gen_expr ND_VAR\n");
         return;
     case ND_ASSIGN:
+        printf("@ gen_expr ND_ASSIGN\n");
         gen_addr(node->lhs);
         push();
         gen_expr(node->rhs);
         pop("r1");
-        printf("  str   r0, [r1]\n");
+        printf("  str   r0, [r1] @ gen_expr ND_ASSIGN\n");
         return;
     default:
         break;
@@ -148,6 +126,15 @@ static void gen_expr(Node *node) {
     error("invalid expression");
 }
 
+static void assign_lvar_offsets(Function *prog) {
+    int offset = 4;
+    for (Obj *var = prog->locals; var; var = var->next) {
+        offset += 4;
+        var->offset = offset;
+    }
+    prog->stack_size = align_to(offset, 16);
+}
+
 static void gen_stmt(Node *node) {
     if (node->kind == ND_EXPR_STMT) {
         gen_expr(node->lhs);
@@ -176,8 +163,14 @@ References:
   http://www.tofla.iconbar.com/tofla/arm/arm02/index.htm
 */
 static void gen_div(void) {
-    printf("\ndiv:\n");
-    gen_prologue(4);
+    printf("\ndiv:\n"
+        "  push  {fp, lr}\n"
+        "  add   fp, sp, #4\n"
+        "  sub   sp, sp, #32\n"
+        "  str   r0, [fp, #-8]\n"
+        "  str   r1, [fp, #-12]\n"
+        "  str   r2, [fp, #-16]\n"
+        "  str   r3, [fp, #-20]\n");
     printf(
         // check for divide by zero
         // @TODO: jump to some sort of panic routine
@@ -212,19 +205,22 @@ static void gen_div(void) {
     printf(
         "div_end:\n"
         "  ldr   r2, [fp, #-16]\n"
-        "  ldr   r3, [fp, #-20]\n");
-    gen_epilogue();
+        "  ldr   r3, [fp, #-20]\n"
+        "  sub   sp, fp, #4\n"
+        "  pop   {fp, pc}\n");
 }
 
-void codegen(Node *node) {
+void codegen(Function *prog) {
+    assign_lvar_offsets(prog);
+
     printf(
         ".global main\n\n"
         "main:\n"
         "  push  {fp, lr}\n"
         "  add   fp, sp, #4\n"
-        "  sub   sp, sp, #208\n");
+        "  sub   sp, sp, #%d\n", prog->stack_size);
 
-    for (Node *n = node; n; n = n->next) {
+    for (Node *n = prog->body; n; n = n->next) {
         gen_stmt(n);
         assert(depth == 0);
     }
@@ -233,7 +229,7 @@ void codegen(Node *node) {
         "  sub   sp, fp, #4\n"
         "  pop   {fp, pc}\n");
 
-    if (contains(node, ND_DIV)) {
+    if (contains(prog->body, ND_DIV)) {
         gen_div();
     }
 }

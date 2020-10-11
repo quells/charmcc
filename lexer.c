@@ -70,6 +70,16 @@ static bool startswith(char *p, char *q) {
     return strncmp(p, q, strlen(q)) == 0;
 }
 
+// Is `c` a valid head character for an identifier?
+static bool is_ident_head(char c) {
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
+}
+
+// Is `c` a valid tail character for an identifier?
+static bool is_ident_tail(char c) {
+    return is_ident_head(c) || ('0' <= c && c <= '9');
+}
+
 // Create linked list of tokens from program source.
 Token *tokenize(char *p) {
     current_input = p;
@@ -93,9 +103,12 @@ Token *tokenize(char *p) {
         }
 
         // Identifier
-        if ('a' <= *p && *p <= 'z') {
-            cur = cur->next = new_token(TK_IDENT, p, p+1);
-            p++;
+        if (is_ident_head(*p)) {
+            char *start = p;
+            do {
+                p++;
+            } while (is_ident_tail(*p));
+            cur = cur->next = new_token(TK_IDENT, start, p);
             continue;
         }
 
