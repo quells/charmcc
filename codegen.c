@@ -4,15 +4,19 @@ static int depth;
 
 /*
 Generate a function prologue.
-Pushes the frame pointer onto the stack, sets it to the stack pointer, then allocates some stack buffer.
+
+Pushes the frame pointer and return address onto the stack,
+sets up the new frame pointer relative to the stack pointer,
+then allocates some stack buffer.
+
 The amount of buffer is 4 + 4*reg_count, since each register takes up 4 bytes.
 Registers are saved starting with r0 at [fp, #-8] and extending downwards.
 */
 static void gen_prologue(int reg_count) {
     int buf = 4 + 4*reg_count;
     printf(
-        "  push  {fp}\n"
-        "  add   fp, sp, #0\n"
+        "  push  {fp, lr}\n"
+        "  add   fp, sp, #4\n"
         "  sub   sp, sp, #%d\n", buf);
     for (int i = 0; i < reg_count; i++) {
         printf("  str   r%d, [fp, #-%d]\n", i, 8 + 4*i);
@@ -25,9 +29,8 @@ Restores the stack to the beginning of the frame, pops the previous frame pointe
 */
 static void gen_epilogue(void) {
     printf(
-        "  add   sp, fp, #0\n"
-        "  pop   {fp}\n"
-        "  bx    lr\n");
+        "  sub   sp, fp, #4\n"
+        "  pop   {fp, pc}\n");
 }
 
 static void push(void) {
