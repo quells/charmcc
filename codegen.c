@@ -59,7 +59,7 @@ static int contains(Node *node, NodeKind kind) {
 static void gen_addr(Node *node) {
     if (node->kind == ND_VAR) {
         int offset = (node->name - 'a' + 1) * 8;
-        printf("  str   r0, [fp, #-%d]\n", offset);
+        printf("  sub   r0, fp, #%d\n", offset);
         return;
     }
 
@@ -74,6 +74,17 @@ static void gen_expr(Node *node) {
     case ND_NEG:
         gen_expr(node->lhs);
         printf("  neg   r0, r0\n");
+        return;
+    case ND_VAR:
+        gen_addr(node);
+        printf("  ldr   r0, [r0]\n");
+        return;
+    case ND_ASSIGN:
+        gen_addr(node->lhs);
+        push();
+        gen_expr(node->rhs);
+        pop("r1");
+        printf("  str   r0, [r1]\n");
         return;
     default:
         break;
@@ -126,17 +137,6 @@ static void gen_expr(Node *node) {
         default:
             break;
         }
-        return;
-    case ND_VAR:
-        gen_addr(node);
-        printf("  mov   r0, [r0]\n");
-        return;
-    case ND_ASSIGN:
-        gen_addr(node->lhs);
-        push();
-        gen_expr(node->rhs);
-        pop("r1");
-        printf("  ldr   r0, [r1]\n");
         return;
     default:
         break;
@@ -228,8 +228,7 @@ void codegen(Node *node) {
 
     printf(
         "  sub   sp, fp, #4\n"
-        "  pop   {fp, lr}\n"
-        "  bx    lr\n");
+        "  pop   {fp, pc}\n");
 
     if (contains(node, ND_DIV)) {
         gen_div();
