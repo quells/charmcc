@@ -11,6 +11,7 @@
 ---------*/
 
 typedef enum {
+    TK_IDENT,    // Identifiers
     TK_RESERVED, // Keywords or punctuation
     TK_NUM,      // Numeric literals
     TK_EOF,      // End-of-file
@@ -38,17 +39,19 @@ Token *tokenize(char *input);
 ----------*/
 
 typedef enum {
-    ND_ADD, // +
-    ND_SUB, // -
-    ND_MUL, // *
-    ND_DIV, // /
-    ND_NEG, // unary -
-    ND_EQ,  // ==
-    ND_NEQ, // !=
-    ND_LT,  // <
-    ND_LTE, // <=
-    ND_NUM, // Integer
+    ND_ADD,    // +
+    ND_SUB,    // -
+    ND_MUL,    // *
+    ND_DIV,    // /
+    ND_NEG,    // unary -
+    ND_EQ,     // ==
+    ND_NEQ,    // !=
+    ND_LT,     // <
+    ND_LTE,    // <=
+    ND_NUM,    // Integer
+    ND_ASSIGN, // =
     ND_EXPR_STMT,
+    ND_VAR,
 } NodeKind;
 
 typedef struct Node Node;
@@ -57,7 +60,8 @@ struct Node {
     Node *next;
     Node *lhs;
     Node *rhs;
-    int val;  // Only if kind == ND_NUM
+    char name; // Only if kind == ND_VAR
+    int val;   // Only if kind == ND_NUM
 };
 
 Node *parse(Token *tok);

@@ -4,15 +4,19 @@ static int depth;
 
 /*
 Generate a function prologue.
-Pushes the frame pointer onto the stack, sets it to the stack pointer, then allocates some stack buffer.
+
+Pushes the frame pointer and return address onto the stack,
+sets up the new frame pointer relative to the stack pointer,
+then allocates some stack buffer.
+
 The amount of buffer is 4 + 4*reg_count, since each register takes up 4 bytes.
 Registers are saved starting with r0 at [fp, #-8] and extending downwards.
 */
 static void gen_prologue(int reg_count) {
     int buf = 4 + 4*reg_count;
     printf(
-        "  push  {fp}\n"
-        "  add   fp, sp, #0\n"
+        "  push  {fp, lr}\n"
+        "  add   fp, sp, #4\n"
         "  sub   sp, sp, #%d\n", buf);
     for (int i = 0; i < reg_count; i++) {
         printf("  str   r%d, [fp, #-%d]\n", i, 8 + 4*i);
@@ -25,9 +29,8 @@ Restores the stack to the beginning of the frame, pops the previous frame pointe
 */
 static void gen_epilogue(void) {
     printf(
-        "  add   sp, fp, #0\n"
-        "  pop   {fp}\n"
-        "  bx    lr\n");
+        "  sub   sp, fp, #4\n"
+        "  pop   {fp, pc}\n");
 }
 
 static void push(void) {
@@ -54,6 +57,18 @@ static int contains(Node *node, NodeKind kind) {
     return contains(node->lhs, kind) || contains(node->rhs, kind);
 }
 
+// Compute absolute address of a node.
+// It's an error if a given node does not reside in memory.
+static void gen_addr(Node *node) {
+    if (node->kind == ND_VAR) {
+        int offset = (node->name - 'a' + 1) * 8;
+        printf("  sub   r0, fp, #%d\n", offset);
+        return;
+    }
+
+    error("not an lvalue");
+}
+
 static void gen_expr(Node *node) {
     switch (node->kind) {
     case ND_NUM:
@@ -62,6 +77,17 @@ static void gen_expr(Node *node) {
     case ND_NEG:
         gen_expr(node->lhs);
         printf("  neg   r0, r0\n");
+        return;
+    case ND_VAR:
+        gen_addr(node);
+        printf("  ldr   r0, [r0]\n");
+        return;
+    case ND_ASSIGN:
+        gen_addr(node->lhs);
+        push();
+        gen_expr(node->rhs);
+        pop("r1");
+        printf("  str   r0, [r1]\n");
         return;
     default:
         break;
@@ -195,7 +221,8 @@ void codegen(Node *node) {
         ".global main\n\n"
         "main:\n"
         "  push  {fp, lr}\n"
-        "  add   fp, sp, #4\n");
+        "  add   fp, sp, #4\n"
+        "  sub   sp, sp, #208\n");
 
     for (Node *n = node; n; n = n->next) {
         gen_stmt(n);
@@ -204,8 +231,7 @@ void codegen(Node *node) {
 
     printf(
         "  sub   sp, fp, #4\n"
-        "  pop   {fp, lr}\n"
-        "  bx    lr\n");
+        "  pop   {fp, pc}\n");
 
     if (contains(node, ND_DIV)) {
         gen_div();
