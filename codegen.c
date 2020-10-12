@@ -38,7 +38,7 @@ static int contains(Node *node, NodeKind kind) {
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
     if (node->kind == ND_VAR) {
-        printf("  sub   r0, fp, #%d @ gen_addr %s\n", node->var->offset, node->var->name);
+        printf("  sub   r0, fp, #%d\n", node->var->offset);
         return;
     }
 
@@ -55,17 +55,15 @@ static void gen_expr(Node *node) {
         printf("  neg   r0, r0\n");
         return;
     case ND_VAR:
-        printf("@ gen_expr ND_VAR\n");
         gen_addr(node);
-        printf("  ldr   r0, [r0] @ gen_expr ND_VAR\n");
+        printf("  ldr   r0, [r0]\n");
         return;
     case ND_ASSIGN:
-        printf("@ gen_expr ND_ASSIGN\n");
         gen_addr(node->lhs);
         push();
         gen_expr(node->rhs);
         pop("r1");
-        printf("  str   r0, [r1] @ gen_expr ND_ASSIGN\n");
+        printf("  str   r0, [r1]\n");
         return;
     default:
         break;
