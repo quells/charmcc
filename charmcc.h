@@ -53,6 +53,7 @@ typedef enum {
     ND_ASSIGN, // =
     ND_EXPR_STMT,
     ND_VAR,
+    ND_RETURN,
 } NodeKind;
 
 typedef struct Node Node;

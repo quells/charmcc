@@ -134,7 +134,11 @@ static void assign_lvar_offsets(Function *prog) {
 }
 
 static void gen_stmt(Node *node) {
-    if (node->kind == ND_EXPR_STMT) {
+    switch (node->kind) {
+    case ND_RETURN:
+        gen_expr(node->lhs);
+        printf("   bl   main.return\n");
+    case ND_EXPR_STMT:
         gen_expr(node->lhs);
         return;
     }
@@ -224,6 +228,7 @@ void codegen(Function *prog) {
     }
 
     printf(
+        "main.return:\n"
         "  sub   sp, fp, #4\n"
         "  pop   {fp, pc}\n");
 

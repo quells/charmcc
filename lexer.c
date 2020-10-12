@@ -80,6 +80,14 @@ static bool is_ident_tail(char c) {
     return is_ident_head(c) || ('0' <= c && c <= '9');
 }
 
+static void convert_keywords(Token *tok) {
+    for (Token *t = tok; t->kind != TK_EOF; t = t->next) {
+        if (equal(t, "return")) {
+            t->kind = TK_RESERVED;
+        }
+    }
+}
+
 // Create linked list of tokens from program source.
 Token *tokenize(char *p) {
     current_input = p;
@@ -102,7 +110,7 @@ Token *tokenize(char *p) {
             continue;
         }
 
-        // Identifier
+        // Identifier or keyword
         if (is_ident_head(*p)) {
             char *start = p;
             do {
@@ -129,5 +137,6 @@ Token *tokenize(char *p) {
     }
 
     cur = cur->next = new_token(TK_EOF, p, p);
+    convert_keywords(head.next);
     return head.next;
 }
