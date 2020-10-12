@@ -56,11 +56,11 @@ static Node *primary(Token **rest, Token *tok);
 static Obj *find_var(Token *tok) {
     for (Obj *var = locals; var; var = var->next) {
         if (strlen(var->name) == tok->len &&
-            strncmp(tok->loc, var->name, tok->len)) {
+            !strncmp(tok->loc, var->name, tok->len)) {
             return var;
         }
-        return NULL;
     }
+    return NULL;
 }
 
 // stmt :: expr-stmt
