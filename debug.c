@@ -51,10 +51,26 @@ static void debug_node(Node *n) {
     case ND_NUM:
         printf("%d", n->val);
         return;
+
     case ND_ASSIGN:
         printf("%s = ", n->lhs->var->name);
         debug_node(n->rhs);
         return;
+    case ND_IF:
+        printf("(if ");
+        debug_node(n->condition);
+        printf(" ");
+        debug_node(n->consequence);
+        if (n->alternative) {
+            printf(" : ");
+            debug_node(n->alternative);
+        }
+        printf("); ");
+        return;
+    case ND_RETURN:
+        debug_unop("return", n);
+        return;
+
     case ND_BLOCK:
         printf("{ ");
         debug_nodes(n->body);
@@ -66,9 +82,6 @@ static void debug_node(Node *n) {
         return;
     case ND_VAR:
         printf("%s", n->var->name);
-        return;
-    case ND_RETURN:
-        debug_unop("return", n);
         return;
     }
 }
