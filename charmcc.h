@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -55,19 +56,35 @@ typedef enum {
 } NodeKind;
 
 typedef struct Node Node;
+
+// Local variable
+typedef struct Obj Obj;
+struct Obj {
+    Obj *next;
+    char *name;
+    int offset; // Offset from frame pointer
+};
+
+typedef struct Function Function;
+struct Function {
+    Node *body;
+    Obj *locals;
+    int stack_size;
+};
+
 struct Node {
     NodeKind kind;
     Node *next;
     Node *lhs;
     Node *rhs;
-    char name; // Only if kind == ND_VAR
-    int val;   // Only if kind == ND_NUM
+    Obj *var; // Only if kind == ND_VAR
+    int val;  // Only if kind == ND_NUM
 };
 
-Node *parse(Token *tok);
+Function *parse(Token *tok);
 
 /*------------
 == Code Gen ==
 ------------*/
 
-void codegen(Node *node);
+void codegen(Function *prog);
