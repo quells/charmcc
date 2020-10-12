@@ -51,6 +51,7 @@ typedef enum {
     ND_LTE,    // <=
     ND_NUM,    // Integer
     ND_ASSIGN, // =
+    ND_BLOCK,
     ND_EXPR_STMT,
     ND_VAR,
     ND_RETURN,
@@ -78,8 +79,9 @@ struct Node {
     Node *next;
     Node *lhs;
     Node *rhs;
-    Obj *var; // Only if kind == ND_VAR
-    int val;  // Only if kind == ND_NUM
+    Node *body; // Only if kind == ND_BLOCK
+    Obj *var;   // Only if kind == ND_VAR
+    int val;    // Only if kind == ND_NUM
 };
 
 Function *parse(Token *tok);
@@ -89,3 +91,5 @@ Function *parse(Token *tok);
 ------------*/
 
 void codegen(Function *prog);
+
+void debug_ast(Function *prog);

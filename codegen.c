@@ -31,7 +31,7 @@ static int contains(Node *node, NodeKind kind) {
         return 1;
     }
 
-    return contains(node->lhs, kind) || contains(node->rhs, kind);
+    return contains(node->lhs, kind) || contains(node->rhs, kind) || contains(node->body, kind) || contains(node->next, kind);
 }
 
 // Compute absolute address of a node.
@@ -135,9 +135,15 @@ static void assign_lvar_offsets(Function *prog) {
 
 static void gen_stmt(Node *node) {
     switch (node->kind) {
+    case ND_BLOCK:
+        for (Node *n = node->body; n; n = n->next) {
+            gen_stmt(n);
+        }
+        return;
     case ND_RETURN:
         gen_expr(node->lhs);
-        printf("   bl   main.return\n");
+        printf("  bl    main.return\n");
+        return;
     case ND_EXPR_STMT:
         gen_expr(node->lhs);
         return;
@@ -222,10 +228,8 @@ void codegen(Function *prog) {
         "  add   fp, sp, #4\n"
         "  sub   sp, sp, #%d\n", prog->stack_size);
 
-    for (Node *n = prog->body; n; n = n->next) {
-        gen_stmt(n);
-        assert(depth == 0);
-    }
+    gen_stmt(prog->body);
+    assert(depth == 0);
 
     printf(
         "main.return:\n"
