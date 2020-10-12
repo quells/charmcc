@@ -67,4 +67,15 @@ assert 3 '{ 1; 2; return 3; }'
 assert 3 '{ {1; {2;} return 6/2;} }'
 assert 5 '{ ;;; return 5; }'
 
+assert 3 '{ if (0) return 2; return 3; }'
+assert 3 '{ if (1-1) return 2; return 3; }'
+assert 2 '{ if (1) return 2; return 3; }'
+assert 2 '{ if (2-1) return 2; return 3; }'
+assert 2 '{ if (2/1) return 6/3; return 12/4; }'
+assert 3 '{ a=0; if (a) return 2; return 3; }'
+assert 2 '{ a=1; b=2; if (a < b) return 2; return 3; }'
+assert 4 '{ if (0) { 1; 2; return 3; } else { return 4; } }'
+assert 3 '{ if (1) { 1; 2; return 3; } else { return 4; } }'
+assert 2 '{ if (1) if (0) { return 1; } else { return 2; } return 3; }'
+
 echo OK

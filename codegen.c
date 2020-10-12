@@ -2,6 +2,11 @@
 
 static int depth;
 
+static int count(void) {
+    static int i = 1;
+    return i++;
+}
+
 static void push(void) {
     printf("  push  {r0}\n");
     depth++;
@@ -31,7 +36,13 @@ static int contains(Node *node, NodeKind kind) {
         return 1;
     }
 
-    return contains(node->lhs, kind) || contains(node->rhs, kind) || contains(node->body, kind) || contains(node->next, kind);
+    return contains(node->lhs, kind)
+        || contains(node->rhs, kind)
+        || contains(node->body, kind)
+        || contains(node->next, kind)
+        || contains(node->condition, kind)
+        || contains(node->consequence, kind)
+        || contains(node->alternative, kind);
 }
 
 // Compute absolute address of a node.
@@ -135,6 +146,20 @@ static void assign_lvar_offsets(Function *prog) {
 
 static void gen_stmt(Node *node) {
     switch (node->kind) {
+    case ND_IF: {
+        int c = count();
+        gen_expr(node->condition);
+        printf("  cmp   r0, #0\n");
+        printf("  beq   main.else.%d\n", c);
+        gen_stmt(node->consequence);
+        printf("  b     main.end.%d\n", c);
+        printf("main.else.%d:\n", c);
+        if (node->alternative) {
+            gen_stmt(node->alternative);
+        }
+        printf("main.end.%d:\n", c);
+        return;
+    }
     case ND_BLOCK:
         for (Node *n = node->body; n; n = n->next) {
             gen_stmt(n);

@@ -50,11 +50,14 @@ typedef enum {
     ND_LT,     // <
     ND_LTE,    // <=
     ND_NUM,    // Integer
+
     ND_ASSIGN, // =
+    ND_IF,     // if
+    ND_RETURN, // return
+
     ND_BLOCK,
     ND_EXPR_STMT,
     ND_VAR,
-    ND_RETURN,
 } NodeKind;
 
 typedef struct Node Node;
@@ -77,8 +80,15 @@ struct Function {
 struct Node {
     NodeKind kind;
     Node *next;
+
     Node *lhs;
     Node *rhs;
+
+    // Only if kind == ND_IF
+    Node *condition;
+    Node *consequence;
+    Node *alternative;
+
     Node *body; // Only if kind == ND_BLOCK
     Obj *var;   // Only if kind == ND_VAR
     int val;    // Only if kind == ND_NUM
