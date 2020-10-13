@@ -81,6 +81,7 @@ struct Function {
 struct Node {
     NodeKind kind;
     Node *next;
+    Token *repr;
 
     Node *lhs;
     Node *rhs;

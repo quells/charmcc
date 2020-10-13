@@ -55,7 +55,7 @@ static void gen_addr(Node *node) {
         return;
     }
 
-    error("not an lvalue");
+    error_tok(node->repr, "not an lvalue");
 }
 
 static void gen_expr(Node *node) {
@@ -134,7 +134,7 @@ static void gen_expr(Node *node) {
         break;
     }
 
-    error("invalid expression");
+    error_tok(node->repr, "invalid expression");
 }
 
 static void assign_lvar_offsets(Function *prog) {
@@ -195,7 +195,7 @@ static void gen_stmt(Node *node) {
         return;
     }
 
-    error("invalid statement");
+    error_tok(node->repr, "invalid statement");
 }
 
 /*
