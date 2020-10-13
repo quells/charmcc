@@ -53,6 +53,7 @@ typedef enum {
 
     ND_ASSIGN, // =
     ND_IF,     // if
+    ND_FOR,    // for
     ND_RETURN, // return
 
     ND_BLOCK,
@@ -84,10 +85,12 @@ struct Node {
     Node *lhs;
     Node *rhs;
 
-    // Only if kind == ND_IF
+    // Only if kind == ND_IF || ND_FOR
     Node *condition;
     Node *consequence;
     Node *alternative;
+    Node *initialize;
+    Node *increment;
 
     Node *body; // Only if kind == ND_BLOCK
     Obj *var;   // Only if kind == ND_VAR

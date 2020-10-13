@@ -66,6 +66,7 @@ static Obj *find_var(Token *tok) {
 
 // stmt :: "return" expr ";"
 //       | "if" "(" expr ")" stmt ("else" stmt)?
+//       | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //       | "{" compound-stmt
 //       | expr-stmt
 static Node *stmt(Token **rest, Token *tok) {
@@ -85,6 +86,26 @@ static Node *stmt(Token **rest, Token *tok) {
             node->alternative = stmt(&tok, tok->next);
         }
         *rest = tok;
+        return node;
+    }
+
+    if (equal(tok, "for")) {
+        Node *node = new_node(ND_FOR);
+        tok = skip(tok->next, "(");
+
+        node->initialize = expr_stmt(&tok, tok);
+
+        if (!equal(tok, ";")) {
+            node->condition = expr(&tok, tok);
+        }
+        tok = skip(tok, ";");
+
+        if (!equal(tok, ")")) {
+            node->increment = expr(&tok, tok);
+        }
+        tok = skip(tok, ")");
+
+        node->consequence = stmt(rest, tok);
         return node;
     }
 

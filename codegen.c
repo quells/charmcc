@@ -42,7 +42,9 @@ static int contains(Node *node, NodeKind kind) {
         || contains(node->next, kind)
         || contains(node->condition, kind)
         || contains(node->consequence, kind)
-        || contains(node->alternative, kind);
+        || contains(node->alternative, kind)
+        || contains(node->initialize, kind)
+        || contains(node->increment, kind);
 }
 
 // Compute absolute address of a node.
@@ -150,14 +152,31 @@ static void gen_stmt(Node *node) {
         int c = count();
         gen_expr(node->condition);
         printf("  cmp   r0, #0\n");
-        printf("  beq   main.else.%d\n", c);
+        printf("  beq   main.if.else.%d\n", c);
         gen_stmt(node->consequence);
-        printf("  b     main.end.%d\n", c);
-        printf("main.else.%d:\n", c);
+        printf("  b     main.if.end.%d\n", c);
+        printf("main.if.else.%d:\n", c);
         if (node->alternative) {
             gen_stmt(node->alternative);
         }
-        printf("main.end.%d:\n", c);
+        printf("main.if.end.%d:\n", c);
+        return;
+    }
+    case ND_FOR: {
+        int c = count();
+        gen_stmt(node->initialize);
+        printf("main.loop.begin.%d:\n", c);
+        if (node->condition) {
+            gen_expr(node->condition);
+            printf("  cmp   r0, #0\n");
+            printf("  beq   main.loop.end.%d\n", c);
+        }
+        gen_stmt(node->consequence);
+        if (node->increment) {
+            gen_expr(node->increment);
+        }
+        printf("  b     main.loop.begin.%d\n", c);
+        printf("main.loop.end.%d:\n", c);
         return;
     }
     case ND_BLOCK:
