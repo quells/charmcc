@@ -67,9 +67,11 @@ static void debug_node(Node *n) {
         }
         printf("); ");
         return;
-    case ND_FOR:
-        printf("(for ");
-        debug_node(n->initialize);
+    case ND_LOOP:
+        printf("(loop ");
+        if (n->initialize) {
+            debug_node(n->initialize);
+        }
         if (n->condition) {
             debug_node(n->condition);
             printf("? ");

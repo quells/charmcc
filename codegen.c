@@ -162,9 +162,11 @@ static void gen_stmt(Node *node) {
         printf("main.if.end.%d:\n", c);
         return;
     }
-    case ND_FOR: {
+    case ND_LOOP: {
         int c = count();
-        gen_stmt(node->initialize);
+        if (node->initialize) {
+            gen_stmt(node->initialize);
+        }
         printf("main.loop.begin.%d:\n", c);
         if (node->condition) {
             gen_expr(node->condition);

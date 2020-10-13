@@ -53,7 +53,7 @@ typedef enum {
 
     ND_ASSIGN, // =
     ND_IF,     // if
-    ND_FOR,    // for
+    ND_LOOP,   // for, while
     ND_RETURN, // return
 
     ND_BLOCK,
@@ -85,7 +85,7 @@ struct Node {
     Node *lhs;
     Node *rhs;
 
-    // Only if kind == ND_IF || ND_FOR
+    // Only if kind == ND_IF || ND_LOOP
     Node *condition;
     Node *consequence;
     Node *alternative;
