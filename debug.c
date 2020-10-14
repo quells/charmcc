@@ -36,6 +36,12 @@ static void debug_node(Node *n) {
     case ND_NEG:
         debug_unop("-", n);
         return;
+    case ND_ADDR:
+        debug_unop("addr", n);
+        return;
+    case ND_DEREF:
+        debug_unop("ptr", n);
+        return;
     case ND_EQ:
         debug_binop("==", n);
         return;
@@ -53,8 +59,9 @@ static void debug_node(Node *n) {
         return;
 
     case ND_ASSIGN:
-        printf("%s = ", n->lhs->var->name);
+        printf("(let %s ", n->lhs->var->name);
         debug_node(n->rhs);
+        printf(")");
         return;
     case ND_IF:
         printf("(if ");
