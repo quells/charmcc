@@ -2,6 +2,8 @@
 
 static int depth;
 
+static void gen_expr(Node *node);
+
 static int count(void) {
     static int i = 1;
     return i++;
@@ -50,9 +52,15 @@ static int contains(Node *node, NodeKind kind) {
 // Compute absolute address of a node.
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
-    if (node->kind == ND_VAR) {
+    switch (node->kind) {
+    case ND_VAR:
         printf("  sub   r0, fp, #%d\n", node->var->offset);
         return;
+    case ND_DEREF:
+        gen_expr(node->lhs);
+        return;
+    default:
+        break;
     }
 
     error_tok(node->repr, "not an lvalue");
@@ -69,6 +77,13 @@ static void gen_expr(Node *node) {
         return;
     case ND_VAR:
         gen_addr(node);
+        printf("  ldr   r0, [r0]\n");
+        return;
+    case ND_ADDR:
+        gen_addr(node->lhs);
+        return;
+    case ND_DEREF:
+        gen_expr(node->lhs);
         printf("  ldr   r0, [r0]\n");
         return;
     case ND_ASSIGN:
