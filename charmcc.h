@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define PTR_SIZE 4
+
 /*---------
 == Lexer ==
 ---------*/
@@ -63,6 +65,7 @@ typedef enum {
     ND_VAR,
 } NodeKind;
 
+typedef struct Type Type;
 typedef struct Node Node;
 
 // Local variable
@@ -83,6 +86,7 @@ struct Function {
 struct Node {
     NodeKind kind;
     Node *next;
+    Type *type;
     Token *repr;
 
     Node *lhs;
@@ -101,6 +105,25 @@ struct Node {
 };
 
 Function *parse(Token *tok);
+
+/*----------
+Type Checker
+----------*/
+
+typedef enum {
+    TY_INT,
+    TY_PTR,
+} TypeKind;
+
+struct Type {
+    TypeKind kind;
+    Type *base;
+};
+
+extern Type *ty_int;
+
+bool is_integer(Type *type);
+void add_type(Node *node);
 
 /*------------
 == Code Gen ==

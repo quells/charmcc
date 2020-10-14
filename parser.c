@@ -44,6 +44,7 @@ static Node *new_num(int val, Token *repr) {
 }
 
 static Node *compound_stmt(Token **rest, Token *tok);
+static Node *stmt(Token **rest, Token *tok);
 static Node *expr_stmt(Token **rest, Token *tok);
 static Node *expr(Token **rest, Token *tok);
 static Node *assign(Token **rest, Token *tok);
@@ -63,6 +64,22 @@ static Obj *find_var(Token *tok) {
         }
     }
     return NULL;
+}
+
+// compound-stmt :: stmt* "}"
+static Node *compound_stmt(Token **rest, Token *tok) {
+    Node *node = new_node(ND_BLOCK, tok);
+
+    Node head = {};
+    Node *cur = &head;
+    while (!equal(tok, "}")) {
+        cur = cur->next = stmt(&tok, tok);
+        add_type(cur);
+    }
+
+    node->body = head.next;
+    *rest = tok->next;
+    return node;
 }
 
 // stmt :: "return" expr ";"
@@ -126,21 +143,6 @@ static Node *stmt(Token **rest, Token *tok) {
     }
 
     return expr_stmt(rest, tok);
-}
-
-// compound-stmt :: stmt* "}"
-static Node *compound_stmt(Token **rest, Token *tok) {
-    Node *node = new_node(ND_BLOCK, tok);
-
-    Node head = {};
-    Node *cur = &head;
-    while (!equal(tok, "}")) {
-        cur = cur->next = stmt(&tok, tok);
-    }
-
-    node->body = head.next;
-    *rest = tok->next;
-    return node;
 }
 
 // expr-stmt :: expr? ";"
@@ -225,6 +227,67 @@ static Node *relational(Token **rest, Token *tok) {
     }
 }
 
+/*
+`+` performs pointer arithmetic if the arguments include a pointer.
+
+Moves the pointer by the size of the elements, not bytes.
+p+n :: p + sizeof(*p)*n
+*/
+static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
+    add_type(lhs);
+    add_type(rhs);
+
+    if (is_integer(lhs->type) && is_integer(rhs->type)) {
+        return new_binary(ND_ADD, lhs, rhs, tok);
+    }
+
+    if (lhs->type->base && rhs->type->base) {
+        error_tok(tok, "invalid operands");
+    }
+
+    if (!lhs->type->base && rhs->type->base) {
+        Node *tmp = lhs;
+        lhs = rhs;
+        rhs = tmp;
+    }
+
+    rhs = new_binary(ND_MUL, rhs, new_num(PTR_SIZE, tok), tok);
+    return new_binary(ND_ADD, lhs, rhs, tok);
+}
+
+/*
+`-` performs pointer arithmetic if the arguments include a pointer.
+
+Moves the pointer by the size of the elements, not bytes.
+p-n :: p - sizeof(*p)*n
+
+The distance between two pointers, in units of the size of the elements.
+p-q :: (p<--->q) / sizeof(*p)
+*/
+static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
+    add_type(lhs);
+    add_type(rhs);
+
+    if (is_integer(lhs->type) && is_integer(rhs->type)) {
+        return new_binary(ND_SUB, lhs, rhs, tok);
+    }
+
+    if (lhs->type->base && is_integer(rhs->type)) {
+        rhs = new_binary(ND_MUL, rhs, new_num(PTR_SIZE, tok), tok);
+        Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+        node->type = lhs->type;
+        return node;
+    }
+
+    if (lhs->type->base && rhs->type->base) {
+        Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+        node->type = ty_int;
+        return new_binary(ND_DIV, node, new_num(PTR_SIZE, tok), tok);
+    }
+
+    error_tok(tok, "invalid operands");
+}
+
 // add :: mul ("+" mul | "-" mul)*
 static Node *add(Token **rest, Token *tok) {
     Node *node = mul(&tok, tok);
@@ -233,12 +296,12 @@ static Node *add(Token **rest, Token *tok) {
         Token *start = tok;
 
         if (equal(tok, "+")) {
-            node = new_binary(ND_ADD, node, mul(&tok, tok->next), start);
+            node = new_add(node, mul(&tok, tok->next), start);
             continue;
         }
 
         if (equal(tok, "-")) {
-            node = new_binary(ND_SUB, node, mul(&tok, tok->next), start);
+            node = new_sub(node, mul(&tok, tok->next), start);
             continue;
         }
 
