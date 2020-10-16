@@ -234,21 +234,16 @@ References:
 static void gen_div(void) {
     printf("\ndiv:\n"
         "  push  {fp, lr}\n"
-        "  add   fp, sp, #4\n"
-        "  sub   sp, sp, #32\n"
-        "  str   r0, [fp, #-8]\n"
-        "  str   r1, [fp, #-12]\n"
-        "  str   r2, [fp, #-16]\n"
-        "  str   r3, [fp, #-20]\n");
+        "  add   fp, sp, #4\n");
     printf(
         // check for divide by zero
         // @TODO: jump to some sort of panic routine
         "  cmp   r1, #0\n"
         "  beq   div_end\n"
+        "  push  {r0, r1}\n"
         // variables
         "  mov   r0, #0\n"         // quotient
-        "  ldr   r1, [fp, #-8]\n"  // dividend / remainder
-        "  ldr   r2, [fp, #-12]\n" // divisor
+        "  pop   {r1, r2}\n"       // dividend / remainder, divisor
         "  mov   r3, #1\n"         // bit field
         "div_shift:\n"
         // shift divisor left until it exceeds dividend
@@ -273,8 +268,6 @@ static void gen_div(void) {
         "  bcc   div_sub\n");
     printf(
         "div_end:\n"
-        "  ldr   r2, [fp, #-16]\n"
-        "  ldr   r3, [fp, #-20]\n"
         "  sub   sp, fp, #4\n"
         "  pop   {fp, pc}\n");
 }
