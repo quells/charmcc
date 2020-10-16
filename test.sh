@@ -1,12 +1,17 @@
 #!/bin/bash
 CC=gcc
 
+cat <<EOF | gcc -xc -c -o tmp2.o -
+int ret3() { return 3; }
+int ret5() { return 5; }
+EOF
+
 assert() {
     expected="$1"
     input="$2"
 
     ./charmcc "$input" > tmp.s || exit
-    $CC -o tmp tmp.s || exit
+    $CC -o tmp tmp.s tmp2.o || exit
     ./tmp
     actual="$?"
 
@@ -106,5 +111,8 @@ assert 5 '{ int x=3; int *y=&x; *y=5; return x; }'
 assert 7 '{ int x=3; int y=5; *(&x+1)=7; return y; }'
 assert 7 '{ int x=3; int y=5; *(&y-2+1)=7; return x; }'
 assert 5 '{ int x=3; return (&x+2)-&x+3; }'
+
+assert 3 '{ return ret3(); }'
+assert 5 '{ return ret5(); }'
 
 echo OK

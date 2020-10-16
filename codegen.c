@@ -93,6 +93,9 @@ static void gen_expr(Node *node) {
         pop("r1");
         printf("  str   r0, [r1]\n");
         return;
+    case ND_FN_CALL:
+        printf("  bl    %s\n", node->func);
+        return;
     default:
         break;
     }
@@ -203,7 +206,7 @@ static void gen_stmt(Node *node) {
         return;
     case ND_RETURN:
         gen_expr(node->lhs);
-        printf("  bl    main.return\n");
+        printf("  b     main.return\n");
         return;
     case ND_EXPR_STMT:
         gen_expr(node->lhs);

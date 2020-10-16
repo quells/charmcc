@@ -421,7 +421,7 @@ static Node *unary(Token **rest, Token *tok) {
 }
 
 // primary :: "(" expr ")"
-//          | ident
+//          | ident ("(" ")")?
 //          | num
 static Node *primary(Token **rest, Token *tok) {
     if (equal(tok, "(")) {
@@ -431,6 +431,13 @@ static Node *primary(Token **rest, Token *tok) {
     }
 
     if (tok->kind == TK_IDENT) {
+        if (equal(tok->next, "(")) {
+            Node *node = new_node(ND_FN_CALL, tok);
+            node->func = strndup(tok->loc, tok->len);
+            *rest = skip(tok->next->next, ")");
+            return node;
+        }
+
         Obj *var = find_var(tok);
         if (!var) {
             error_tok(tok, "undefined variable");
@@ -483,6 +490,7 @@ void free_node(Node *n) {
     free_node(n->increment);
 
     free_node(n->body);
+    if (n->func != NULL) free(n->func);
 
     free(n);
 }

@@ -65,6 +65,7 @@ typedef enum {
     ND_BLOCK,
     ND_EXPR_STMT,
     ND_VAR,
+    ND_FN_CALL,
 } NodeKind;
 
 typedef struct Type Type;
@@ -104,6 +105,7 @@ struct Node {
 
     Node *body; // Only if kind == ND_BLOCK
     Obj *var;   // Only if kind == ND_VAR
+    char *func; // Only if kind == ND_FN_CALL
     int val;    // Only if kind == ND_NUM
 };
 

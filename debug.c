@@ -113,6 +113,9 @@ static void debug_node(Node *n) {
     case ND_VAR:
         printf("%s", n->var->name);
         return;
+    case ND_FN_CALL:
+        printf("(call %s)", n->func);
+        return;
     }
 
     error_tok(n->repr, "unhandled node");
