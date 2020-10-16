@@ -2,8 +2,13 @@
 
 Type *ty_int = &(Type){TY_INT};
 
-bool is_integer(Type *ty) {
-    return ty->kind == TY_INT;
+void free_type(Type *t) {
+    if (t == NULL) return;
+    if (t->kind == TY_PTR) free(t);
+}
+
+bool is_integer(Type *type) {
+    return type->kind == TY_INT;
 }
 
 Type *pointer_to(Type *base) {

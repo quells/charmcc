@@ -27,5 +27,8 @@ int main(int argc, char **argv) {
         codegen(prog);
     }
 
+    free_tokens(tok);
+    free_ast(prog);
+
     return 0;
 }

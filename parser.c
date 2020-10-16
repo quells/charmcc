@@ -392,3 +392,37 @@ Function *parse(Token *tok) {
     prog->locals = locals;
     return prog;
 }
+
+void free_obj(Obj *o) {
+    if (o == NULL) return;
+
+    free_obj(o->next);
+    free(o->name);
+    free(o);
+}
+
+void free_node(Node *n) {
+    if (n == NULL) return;
+
+    free_node(n->next);
+    free_type(n->type);
+
+    free_node(n->lhs);
+    free_node(n->rhs);
+
+    free_node(n->condition);
+    free_node(n->consequence);
+    free_node(n->alternative);
+    free_node(n->initialize);
+    free_node(n->increment);
+
+    free_node(n->body);
+
+    free(n);
+}
+
+void free_ast(Function *prog) {
+    free_obj(prog->locals);
+    free_node(prog->body);
+    free(prog);
+}

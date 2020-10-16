@@ -150,3 +150,10 @@ Token *tokenize(char *p) {
     convert_keywords(head.next);
     return head.next;
 }
+
+void free_tokens(Token *tok) {
+    if (tok == NULL) return;
+
+    free_tokens(tok->next);
+    free(tok);
+}

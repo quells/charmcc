@@ -36,6 +36,7 @@ void error_tok(Token *tok, char *fmt, ...);
 bool equal(Token *tok, char *op);
 Token *skip(Token *tok, char *op);
 Token *tokenize(char *input);
+void free_tokens(Token *tok);
 
 /*----------
 == Parser ==
@@ -105,6 +106,7 @@ struct Node {
 };
 
 Function *parse(Token *tok);
+void free_ast(Function *prog);
 
 /*----------
 Type Checker
@@ -124,6 +126,7 @@ extern Type *ty_int;
 
 bool is_integer(Type *type);
 void add_type(Node *node);
+void free_type(Type *type);
 
 /*------------
 == Code Gen ==

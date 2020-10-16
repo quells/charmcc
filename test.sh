@@ -18,6 +18,15 @@ assert() {
     fi
 
     ./charmcc --debug "$input" > /dev/null || exit
+
+    if [ -n "$VALGRIND" ]; then
+        valgrind ./charmcc "$input" 2>&1 >/dev/null | grep 'no leaks are possible' >/dev/null
+        leaky="$?"
+        if [ "$leaky" = "1" ]; then
+            echo "leak detected"
+            exit 1
+        fi
+    fi
 }
 
 assert 0  '{ return 0; }'
