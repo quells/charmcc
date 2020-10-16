@@ -49,6 +49,15 @@ Token *skip(Token *tok, char *s) {
     return tok->next;
 }
 
+bool consume(Token **rest, Token *tok, char *str) {
+    if (equal(tok, str)) {
+        *rest = tok->next;
+        return true;
+    }
+    *rest = tok;
+    return false;
+}
+
 // Ensure that the current token is TK_NUM.
 static int get_number(Token *tok) {
     if (tok->kind != TK_NUM) {
@@ -81,7 +90,7 @@ static bool is_ident_tail(char c) {
 }
 
 static bool is_keyword(Token *tok) {
-    static char *kw[] = {"return", "if", "else", "for", "while"};
+    static char *kw[] = {"return", "if", "else", "for", "while", "int"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
         if (equal(tok, kw[i])) {
             return true;
