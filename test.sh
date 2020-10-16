@@ -16,6 +16,8 @@ assert() {
         echo "$input => $actual, expected $expected"
         exit 1
     fi
+
+    ./charmcc --debug "$input" > /dev/null || exit
 }
 
 assert 0  '{ return 0; }'

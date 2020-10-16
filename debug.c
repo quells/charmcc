@@ -30,6 +30,9 @@ static void debug_node(Node *n) {
     case ND_SUB:
         debug_binop("-", n);
         return;
+    case ND_MUL:
+        debug_binop("*", n);
+        return;
     case ND_DIV:
         debug_binop("/", n);
         return;
@@ -37,10 +40,14 @@ static void debug_node(Node *n) {
         debug_unop("-", n);
         return;
     case ND_ADDR:
-        debug_unop("addr", n);
+        printf("(addr ");
+        debug_node(n->lhs);
+        printf(")");
         return;
     case ND_DEREF:
-        debug_unop("ptr", n);
+        printf("(deref ");
+        debug_node(n->lhs);
+        printf(")");
         return;
     case ND_EQ:
         debug_binop("==", n);
@@ -59,7 +66,9 @@ static void debug_node(Node *n) {
         return;
 
     case ND_ASSIGN:
-        printf("(let %s ", n->lhs->var->name);
+        printf("(let ");
+        debug_node(n->lhs);
+        printf(" ");
         debug_node(n->rhs);
         printf(")");
         return;
@@ -81,12 +90,11 @@ static void debug_node(Node *n) {
         }
         if (n->condition) {
             debug_node(n->condition);
-            printf("? ");
         }
-        debug_node(n->consequence);
         if (n->increment) {
             debug_node(n->increment);
         }
+        debug_node(n->consequence);
         printf("); ");
         return;
     case ND_RETURN:
@@ -106,6 +114,8 @@ static void debug_node(Node *n) {
         printf("%s", n->var->name);
         return;
     }
+
+    error_tok(n->repr, "unhandled node");
 }
 
 void debug_ast(Function *prog) {
