@@ -4,7 +4,12 @@ Type *ty_int = &(Type){TY_INT};
 
 void free_type(Type *t) {
     if (t == NULL) return;
-    if (t->kind == TY_PTR) free(t);
+    switch (t->kind) {
+        case TY_INT:
+            break;
+        default:
+            free(t);
+    }
 }
 
 bool is_integer(Type *type) {
@@ -15,6 +20,13 @@ Type *pointer_to(Type *base) {
     Type *type = calloc(1, sizeof(Type));
     type->kind = TY_PTR;
     type->base = base;
+    return type;
+}
+
+Type *func_type(Type *return_type) {
+    Type *type = calloc(1, sizeof(Type));
+    type->kind = TY_FUNC;
+    type->return_type = return_type;
     return type;
 }
 

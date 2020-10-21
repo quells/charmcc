@@ -62,6 +62,8 @@ static Obj *find_var(Token *tok) {
     return NULL;
 }
 
+static Type *typespec(Token **rest, Token *tok);
+static Type *declarator(Token **rest, Token *tok, Type *type);
 static Node *declaration(Token **rest, Token *tok);
 static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
@@ -81,7 +83,18 @@ static Type *typespec(Token **rest, Token *tok) {
     return ty_int;
 }
 
-// declarator :: "*"* ident
+// type-suffix :: ("(" func-params)?
+static Type *type_suffix(Token **rest, Token *tok, Type *type) {
+    if (equal(tok, "(")) {
+        *rest = skip(tok->next, ")");
+        return func_type(type);
+    }
+
+    *rest = tok;
+    return type;
+}
+
+// declarator :: "*"* ident type-suffix
 static Type *declarator(Token **rest, Token *tok, Type *type) {
     while (consume(&tok, tok, "*")) {
         type = pointer_to(type);
@@ -91,8 +104,8 @@ static Type *declarator(Token **rest, Token *tok, Type *type) {
         error_tok(tok, "expected a variable name");
     }
 
+    type = type_suffix(rest, tok->next, type);
     type->name = tok;
-    *rest = tok->next;
     return type;
 }
 
@@ -476,14 +489,32 @@ static Node *primary(Token **rest, Token *tok) {
     return NULL;
 }
 
-// program :: stmt*
-Function *parse(Token *tok) {
-    tok = skip(tok, "{");
+// function-definition :: stmt*
+static Function *function(Token **rest, Token *tok) {
+    Type *type = typespec(&tok, tok);
+    type = declarator(&tok, tok, type);
 
-    Function *prog = calloc(1, sizeof(Function));
-    prog->body = compound_stmt(&tok, tok);
-    prog->locals = locals;
-    return prog;
+    locals = NULL;
+
+    Function *fn = calloc(1, sizeof(Function));
+    fn->name = get_ident(type->name);
+
+    tok = skip(tok, "{");
+    fn->body = compound_stmt(&tok, tok);
+    fn->locals = locals;
+    return fn;
+}
+
+// program :: function-definition*
+Function *parse(Token *tok) {
+    Function head = {};
+    Function *cur = &head;
+
+    while (tok->kind != TK_EOF) {
+        cur = cur->next = function(&tok, tok);
+    }
+
+    return head.next;
 }
 
 void free_obj(Obj *o) {

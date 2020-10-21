@@ -82,6 +82,8 @@ struct Obj {
 
 typedef struct Function Function;
 struct Function {
+    Function *next;
+    char *name;
     Node *body;
     Obj *locals;
     int stack_size;
@@ -122,18 +124,21 @@ Type Checker
 typedef enum {
     TY_INT,
     TY_PTR,
+    TY_FUNC,
 } TypeKind;
 
 struct Type {
     TypeKind kind;
     Type *base;
     Token *name;
+    Type *return_type;
 };
 
 extern Type *ty_int;
 
 bool is_integer(Type *type);
 Type *pointer_to(Type *base);
+Type *func_type(Type *return_type);
 void add_type(Node *node);
 void free_type(Type *type);
 
