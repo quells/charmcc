@@ -4,6 +4,9 @@ CC=gcc
 cat <<EOF | gcc -xc -c -o tmp2.o -
 int ret3() { return 3; }
 int ret5() { return 5; }
+int add(int x, int y) { return x+y; }
+int sub(int x, int y) { return x-y; }
+int add4(int a, int b, int c, int d) { return a+b+c+d; }
 EOF
 
 assert() {
@@ -112,7 +115,10 @@ assert 7 '{ int x=3; int y=5; *(&x+1)=7; return y; }'
 assert 7 '{ int x=3; int y=5; *(&y-2+1)=7; return x; }'
 assert 5 '{ int x=3; return (&x+2)-&x+3; }'
 
-assert 3 '{ return ret3(); }'
-assert 5 '{ return ret5(); }'
+assert 3  '{ return ret3(); }'
+assert 5  '{ return ret5(); }'
+assert 8  '{ return add(3, 5); }'
+assert 2  '{ return sub(5, 3); }'
+assert 10 '{ return add4(1, 2, 3, 4); }'
 
 echo OK

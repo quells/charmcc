@@ -93,9 +93,24 @@ static void gen_expr(Node *node) {
         pop("r1");
         printf("  str   r0, [r1]\n");
         return;
-    case ND_FN_CALL:
+    case ND_FN_CALL: {
+        int nargs = 0;
+        for (Node *arg = node->args; arg; arg = arg->next) {
+            gen_expr(arg);
+            push();
+            nargs++;
+        }
+
+        assert(nargs <= 4);
+        char reg[3] = {'r', '_', '\0'};
+        for (int i = nargs - 1; i >= 0; i--) {
+            reg[1] = '0' + i;
+            pop(reg);
+        }
+
         printf("  bl    %s\n", node->func);
         return;
+    }
     default:
         break;
     }

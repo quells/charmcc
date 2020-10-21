@@ -420,8 +420,31 @@ static Node *unary(Token **rest, Token *tok) {
     return primary(rest, tok);
 }
 
+// fn-call :: ident "(" (assign, ("," assign)*)? ")"
+static Node *fn_call(Token **rest, Token *tok) {
+    Token *start = tok;
+    tok = tok->next->next;
+
+    Node head = {};
+    Node *cur = &head;
+
+    while (!equal(tok, ")")) {
+        if (cur != &head) {
+            tok = skip(tok, ",");
+        }
+        cur = cur->next = assign(&tok, tok);
+    }
+
+    *rest = skip(tok, ")");
+
+    Node *node = new_node(ND_FN_CALL, start);
+    node->func = strndup(start->loc, start->len);
+    node->args = head.next;
+    return node;
+}
+
 // primary :: "(" expr ")"
-//          | ident ("(" ")")?
+//          | ident fn-args?
 //          | num
 static Node *primary(Token **rest, Token *tok) {
     if (equal(tok, "(")) {
@@ -432,10 +455,7 @@ static Node *primary(Token **rest, Token *tok) {
 
     if (tok->kind == TK_IDENT) {
         if (equal(tok->next, "(")) {
-            Node *node = new_node(ND_FN_CALL, tok);
-            node->func = strndup(tok->loc, tok->len);
-            *rest = skip(tok->next->next, ")");
-            return node;
+            return fn_call(rest, tok);
         }
 
         Obj *var = find_var(tok);
@@ -490,7 +510,9 @@ void free_node(Node *n) {
     free_node(n->increment);
 
     free_node(n->body);
+    
     if (n->func != NULL) free(n->func);
+    free_node(n->args);
 
     free(n);
 }

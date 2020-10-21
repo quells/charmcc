@@ -103,9 +103,12 @@ struct Node {
     Node *initialize;
     Node *increment;
 
+    // Only if kind == ND_FN_CALL
+    char *func;
+    Node *args;
+
     Node *body; // Only if kind == ND_BLOCK
     Obj *var;   // Only if kind == ND_VAR
-    char *func; // Only if kind == ND_FN_CALL
     int val;    // Only if kind == ND_NUM
 };
 
