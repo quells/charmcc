@@ -114,7 +114,12 @@ static void debug_node(Node *n) {
         printf("%s", n->var->name);
         return;
     case ND_FN_CALL:
-        printf("(call %s)", n->func);
+        printf("(call %s", n->func);
+        for (Node *arg = n->args; arg; arg = arg->next) {
+            printf(" ");
+            debug_node(arg);
+        }
+        printf(")");
         return;
     }
 
