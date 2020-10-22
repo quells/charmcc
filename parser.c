@@ -365,6 +365,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
     }
 
     error_tok(tok, "invalid operands");
+    return NULL;
 }
 
 // add :: mul ("+" mul | "-" mul)*
