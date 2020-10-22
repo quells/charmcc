@@ -500,7 +500,7 @@ static Function *function(Token **rest, Token *tok) {
     fn->name = get_ident(type->name);
 
     tok = skip(tok, "{");
-    fn->body = compound_stmt(&tok, tok);
+    fn->body = compound_stmt(rest, tok);
     fn->locals = locals;
     return fn;
 }
@@ -548,8 +548,16 @@ void free_node(Node *n) {
     free(n);
 }
 
+void free_function(Function *f) {
+    if (f == NULL) return;
+
+    free_function(f->next);
+    free_obj(f->locals);
+    free_node(f->body);
+
+    free(f);
+}
+
 void free_ast(Function *prog) {
-    free_obj(prog->locals);
-    free_node(prog->body);
-    free(prog);
+    free_function(prog);
 }

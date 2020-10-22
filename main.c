@@ -6,7 +6,7 @@ int main(int argc, char **argv) {
     }
 
     bool debug = false;
-    char* source;
+    char *source;
     if (argc == 2) {
         source = argv[1];
     } else {
