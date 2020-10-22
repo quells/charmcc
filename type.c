@@ -4,6 +4,9 @@ Type *ty_int = &(Type){TY_INT};
 
 void free_type(Type *t) {
     if (t == NULL) return;
+
+    free_type(t->return_type);
+
     switch (t->kind) {
         case TY_INT:
             break;
