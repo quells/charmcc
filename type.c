@@ -79,5 +79,7 @@ void add_type(Node *node) {
         }
         node->type = node->lhs->type->base;
         return;
+    default:
+        break;
     }
 }
