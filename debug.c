@@ -22,6 +22,15 @@ static void debug_unop(char *op, Node *n) {
     printf(")");
 }
 
+static void debug_type(Type *t) {
+    if (t == NULL) return;
+
+    if (t->kind == TY_PTR) {
+        printf("*");
+        debug_type(t->base);
+    }
+}
+
 static void debug_node(Node *n) {
     switch (n->kind) {
     case ND_ADD:
@@ -111,6 +120,9 @@ static void debug_node(Node *n) {
         printf("; ");
         return;
     case ND_VAR:
+        if (n->var->type->kind == TY_PTR) {
+            debug_type(n->var->type);
+        }
         printf("%s", n->var->name);
         return;
     case ND_FN_CALL:

@@ -10,8 +10,13 @@ void free_type(Type *t) {
     switch (t->kind) {
         case TY_INT:
             break;
-        default:
+        case TY_PTR:
+        case TY_FUNC:
+            free_type(t->base);
             free(t);
+        default:
+            // ignore previously freed types
+            break;
     }
 }
 

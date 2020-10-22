@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/charmcc",
-            "args": [],
+            "args": ["--debug", "int main() { int x=3; return *&x; }"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

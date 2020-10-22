@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
     Token *tok = tokenize(source);
     Function *prog = parse(tok);
-    
+
     if (debug) {
         debug_ast(prog);
     } else {

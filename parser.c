@@ -552,10 +552,10 @@ void free_node(Node *n) {
 void free_function(Function *f) {
     if (f == NULL) return;
 
-    free(f->name);
     free_function(f->next);
-    free_obj(f->locals);
     free_node(f->body);
+    free_obj(f->locals);
+    free(f->name);
 
     free(f);
 }

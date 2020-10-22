@@ -28,7 +28,7 @@ assert() {
     ./charmcc --debug "$input" > /dev/null || exit
 
     if [ -n "$VALGRIND" ]; then
-        valgrind ./charmcc "$input" 2>&1 >/dev/null | grep 'int main() no leaks are possible' >/dev/null
+        valgrind ./charmcc "$input" 2>&1 >/dev/null | grep 'no leaks are possible' >/dev/null
         leaky="$?"
         if [ "$leaky" = "1" ]; then
             echo "leak detected"
