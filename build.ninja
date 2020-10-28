@@ -1,0 +1,15 @@
+rule cco
+  command = gcc -std=c11 -g -fno-common -c -o $out $in
+  description = compile c obj
+
+rule cc
+  command = gcc -std=c11 -g -fno-common -o $out $in
+  description = compile c exe
+
+build codegen.o: cco codegen.c
+build debug.o: cco debug.c
+build lexer.o: cco lexer.c
+build main.o: cco main.c
+build parser.o: cco parser.c
+build type.o: cco type.c
+build charmcc: cc lexer.o type.o parser.o main.o debug.o codegen.o
