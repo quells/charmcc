@@ -69,6 +69,29 @@ static int get_number(Token *tok) {
 // Create a token.
 static Token *new_token(TokenKind kind, char *start, char *end) {
     Token *tok = calloc(1, sizeof(Token));
+
+    #if DEBUG_ALLOCS
+    char *raw = calloc(end - start + 1, sizeof(char));
+    strncpy(raw, start, end - start);
+    raw[end-start] = '\0';
+    fprintf(stderr, "alloc token %p ", tok);
+    switch (kind) {
+    case TK_IDENT:
+        fprintf(stderr, "ident %s\n", raw);
+        break;
+    case TK_RESERVED:
+        fprintf(stderr, "reserved %s\n", raw);
+        break;
+    case TK_NUM:
+        fprintf(stderr, "number %s\n", raw);
+        break;
+    case TK_EOF:
+        fprintf(stderr, "eof\n");
+        break;
+    }
+    free(raw);
+    #endif
+
     tok->kind = kind;
     tok->loc = start;
     tok->len = end - start;
@@ -164,5 +187,28 @@ void free_tokens(Token *tok) {
     if (tok == NULL) return;
 
     free_tokens(tok->next);
+
+    #if DEBUG_ALLOCS
+    char *raw = calloc(tok->len + 1, sizeof(char));
+    strncpy(raw, tok->loc, tok->len);
+    raw[tok->len] = '\0';
+    fprintf(stderr, "free  token %p ", tok);
+    switch (tok->kind) {
+    case TK_IDENT:
+        fprintf(stderr, "ident %s\n", raw);
+        break;
+    case TK_RESERVED:
+        fprintf(stderr, "reserved %s\n", raw);
+        break;
+    case TK_NUM:
+        fprintf(stderr, "number %s\n", raw);
+        break;
+    case TK_EOF:
+        fprintf(stderr, "eof\n");
+        break;
+    }
+    free(raw);
+    #endif
+
     free(tok);
 }

@@ -6,7 +6,7 @@ int main(int argc, char **argv) {
     }
 
     bool debug = false;
-    char* source;
+    char *source;
     if (argc == 2) {
         source = argv[1];
     } else {
@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
     Token *tok = tokenize(source);
     Function *prog = parse(tok);
-    
+
     if (debug) {
         debug_ast(prog);
     } else {

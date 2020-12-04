@@ -5,6 +5,73 @@ Obj *locals;
 
 static Node *new_node(NodeKind kind, Token *repr) {
     Node *node = calloc(1, sizeof(Node));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc node  %p ", node);
+    switch (kind) {
+    case ND_ADD:
+        fprintf(stderr, "add\n");
+        break;
+    case ND_SUB:
+        fprintf(stderr, "sub\n");
+        break;
+    case ND_MUL:
+        fprintf(stderr, "mul\n");
+        break;
+    case ND_DIV:
+        fprintf(stderr, "div\n");
+        break;
+    case ND_NEG:
+        fprintf(stderr, "neg\n");
+        break;
+    case ND_ADDR:
+        fprintf(stderr, "addr\n");
+        break;
+    case ND_DEREF:
+        fprintf(stderr, "deref\n");
+        break;
+    case ND_EQ:
+        fprintf(stderr, "eq\n");
+        break;
+    case ND_NEQ:
+        fprintf(stderr, "neq\n");
+        break;
+    case ND_LT:
+        fprintf(stderr, "lt\n");
+        break;
+    case ND_LTE:
+        fprintf(stderr, "lte\n");
+        break;
+    case ND_NUM:
+        fprintf(stderr, "num\n");
+        break;
+    case ND_ASSIGN:
+        fprintf(stderr, "assign\n");
+        break;
+    case ND_IF:
+        fprintf(stderr, "if\n");
+        break;
+    case ND_LOOP:
+        fprintf(stderr, "loop\n");
+        break;
+    case ND_RETURN:
+        fprintf(stderr, "return\n");
+        break;
+    case ND_BLOCK:
+        fprintf(stderr, "block\n");
+        break;
+    case ND_EXPR_STMT:
+        fprintf(stderr, "expr stmt\n");
+        break;
+    case ND_VAR:
+        fprintf(stderr, "var\n");
+        break;
+    case ND_FN_CALL:
+        fprintf(stderr, "fn call\n");
+        break;
+    }
+    #endif
+
     node->kind = kind;
     node->repr = repr;
     return node;
@@ -31,6 +98,23 @@ static Node *new_var(Obj *var, Token *repr) {
 
 static Obj *new_lvar(char *name, Type *type) {
     Obj *var = calloc(1, sizeof(Obj));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc obj   %p ", var);
+    switch (type->kind) {
+    case TY_INT:
+        fprintf(stderr, "int");
+        break;
+    case TY_PTR: {
+        fprintf(stderr, "ptr");
+        break;
+    }
+    case TY_FUNC:
+        fprintf(stderr, "func");
+        break;
+    }
+    #endif
+
     var->name = name;
     var->type = type;
     var->next = locals;
@@ -62,6 +146,8 @@ static Obj *find_var(Token *tok) {
     return NULL;
 }
 
+static Type *typespec(Token **rest, Token *tok);
+static Type *declarator(Token **rest, Token *tok, Type *type);
 static Node *declaration(Token **rest, Token *tok);
 static Node *compound_stmt(Token **rest, Token *tok);
 static Node *stmt(Token **rest, Token *tok);
@@ -81,7 +167,18 @@ static Type *typespec(Token **rest, Token *tok) {
     return ty_int;
 }
 
-// declarator :: "*"* ident
+// type-suffix :: ("(" func-params)?
+static Type *type_suffix(Token **rest, Token *tok, Type *type) {
+    if (equal(tok, "(")) {
+        *rest = skip(tok->next, ")");
+        return func_type(type);
+    }
+
+    *rest = tok;
+    return type;
+}
+
+// declarator :: "*"* ident type-suffix
 static Type *declarator(Token **rest, Token *tok, Type *type) {
     while (consume(&tok, tok, "*")) {
         type = pointer_to(type);
@@ -91,8 +188,8 @@ static Type *declarator(Token **rest, Token *tok, Type *type) {
         error_tok(tok, "expected a variable name");
     }
 
+    type = type_suffix(rest, tok->next, type);
     type->name = tok;
-    *rest = tok->next;
     return type;
 }
 
@@ -352,6 +449,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
     }
 
     error_tok(tok, "invalid operands");
+    return NULL;
 }
 
 // add :: mul ("+" mul | "-" mul)*
@@ -476,20 +574,61 @@ static Node *primary(Token **rest, Token *tok) {
     return NULL;
 }
 
-// program :: stmt*
-Function *parse(Token *tok) {
-    tok = skip(tok, "{");
+// function-definition :: stmt*
+static Function *function(Token **rest, Token *tok) {
+    Type *type = typespec(&tok, tok);
+    type = declarator(&tok, tok, type);
 
-    Function *prog = calloc(1, sizeof(Function));
-    prog->body = compound_stmt(&tok, tok);
-    prog->locals = locals;
-    return prog;
+    locals = NULL;
+
+    Function *fn = calloc(1, sizeof(Function));
+    fn->name = get_ident(type->name);
+    fn->type = type;
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc func  %p %s\n", fn, fn->name);
+    #endif
+
+    tok = skip(tok, "{");
+    fn->body = compound_stmt(rest, tok);
+    fn->locals = locals;
+    return fn;
+}
+
+// program :: function-definition*
+Function *parse(Token *tok) {
+    Function head = {};
+    Function *cur = &head;
+
+    while (tok->kind != TK_EOF) {
+        cur = cur->next = function(&tok, tok);
+    }
+
+    return head.next;
 }
 
 void free_obj(Obj *o) {
     if (o == NULL) return;
 
     free_obj(o->next);
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "free  obj   %p ", o);
+    switch (o->type->kind) {
+    case TY_INT:
+        fprintf(stderr, "int");
+        break;
+    case TY_PTR: {
+        fprintf(stderr, "ptr");
+        break;
+    }
+    case TY_FUNC:
+        fprintf(stderr, "func");
+        break;
+    }
+    fprintf(stderr, " %s\n", o->name);
+    #endif
+
     free(o->name);
     free(o);
 }
@@ -509,16 +648,96 @@ void free_node(Node *n) {
     free_node(n->initialize);
     free_node(n->increment);
 
+    free_node(n->args);
     free_node(n->body);
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "free  node  %p ", n);
+    switch (n->kind) {
+    case ND_ADD:
+        fprintf(stderr, "add\n");
+        break;
+    case ND_SUB:
+        fprintf(stderr, "sub\n");
+        break;
+    case ND_MUL:
+        fprintf(stderr, "mul\n");
+        break;
+    case ND_DIV:
+        fprintf(stderr, "div\n");
+        break;
+    case ND_NEG:
+        fprintf(stderr, "neg\n");
+        break;
+    case ND_ADDR:
+        fprintf(stderr, "addr\n");
+        break;
+    case ND_DEREF:
+        fprintf(stderr, "deref\n");
+        break;
+    case ND_EQ:
+        fprintf(stderr, "eq\n");
+        break;
+    case ND_NEQ:
+        fprintf(stderr, "neq\n");
+        break;
+    case ND_LT:
+        fprintf(stderr, "lt\n");
+        break;
+    case ND_LTE:
+        fprintf(stderr, "lte\n");
+        break;
+    case ND_NUM:
+        fprintf(stderr, "num\n");
+        break;
+    case ND_ASSIGN:
+        fprintf(stderr, "assign\n");
+        break;
+    case ND_IF:
+        fprintf(stderr, "if\n");
+        break;
+    case ND_LOOP:
+        fprintf(stderr, "loop\n");
+        break;
+    case ND_RETURN:
+        fprintf(stderr, "return\n");
+        break;
+    case ND_BLOCK:
+        fprintf(stderr, "block\n");
+        break;
+    case ND_EXPR_STMT:
+        fprintf(stderr, "expr stmt\n");
+        break;
+    case ND_VAR:
+        fprintf(stderr, "var\n");
+        break;
+    case ND_FN_CALL:
+        fprintf(stderr, "fn call %s\n", n->func);
+        break;
+    }
+    #endif
     
     if (n->func != NULL) free(n->func);
-    free_node(n->args);
 
     free(n);
 }
 
+void free_function(Function *f) {
+    if (f == NULL) return;
+
+    free_function(f->next);
+    free_type(f->type);
+    free_node(f->body);
+    free_obj(f->locals);
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "free  func  %p %s\n", f, f->name);
+    #endif
+
+    free(f->name);
+    free(f);
+}
+
 void free_ast(Function *prog) {
-    free_obj(prog->locals);
-    free_node(prog->body);
-    free(prog);
+    free_function(prog);
 }

@@ -226,6 +226,8 @@ static void gen_stmt(Node *node) {
     case ND_EXPR_STMT:
         gen_expr(node->lhs);
         return;
+    default:
+        break;
     }
 
     error_tok(node->repr, "invalid statement");
