@@ -1,11 +1,6 @@
-CFLAGS=-std=c11 -g -fno-common
-SRCS=$(wildcard *.c)
-OBJS=$(SRCS:.c=.o)
-
-charmcc: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-$(OBJS): charmcc.h
+.PHONY: charmcc
+charmcc:
+	ninja
 
 .PHONY: test
 test: charmcc
