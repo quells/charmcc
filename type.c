@@ -11,9 +11,19 @@ void free_type(Type *t) {
         case TY_INT:
             break;
         case TY_PTR:
-        case TY_FUNC:
+            #if DEBUG_ALLOCS
+            fprintf(stderr, "free  ptrty %p\n", t);
+            #endif
             free_type(t->base);
             free(t);
+            break;
+        case TY_FUNC:
+            #if DEBUG_ALLOCS
+            fprintf(stderr, "free  fn ty %p\n", t);
+            #endif
+            free_type(t->base);
+            free(t);
+            break;
         default:
             // ignore previously freed types
             break;
@@ -26,6 +36,11 @@ bool is_integer(Type *type) {
 
 Type *pointer_to(Type *base) {
     Type *type = calloc(1, sizeof(Type));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc ptrty %p\n", type);
+    #endif
+
     type->kind = TY_PTR;
     type->base = base;
     return type;
@@ -33,6 +48,11 @@ Type *pointer_to(Type *base) {
 
 Type *func_type(Type *return_type) {
     Type *type = calloc(1, sizeof(Type));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc fn ty %p\n", type);
+    #endif
+
     type->kind = TY_FUNC;
     type->return_type = return_type;
     return type;
