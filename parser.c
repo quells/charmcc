@@ -113,7 +113,6 @@ static Obj *new_lvar(char *name, Type *type) {
         fprintf(stderr, "func");
         break;
     }
-    fprintf(stderr, " %s\n", type->name);
     #endif
 
     var->name = name;
