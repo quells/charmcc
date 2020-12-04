@@ -584,6 +584,7 @@ static Function *function(Token **rest, Token *tok) {
 
     Function *fn = calloc(1, sizeof(Function));
     fn->name = get_ident(type->name);
+    fn->type = type;
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc func  %p %s\n", fn, fn->name);
@@ -726,6 +727,7 @@ void free_function(Function *f) {
     if (f == NULL) return;
 
     free_function(f->next);
+    free_type(f->type);
     free_node(f->body);
     free_obj(f->locals);
 
