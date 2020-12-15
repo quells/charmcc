@@ -34,6 +34,17 @@ bool is_integer(Type *type) {
     return type->kind == TY_INT;
 }
 
+Type *copy_type(Type *type) {
+    Type *copy = calloc(1, sizeof(Type));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc copy of type %p\n", type);
+    #endif
+
+    *copy = *type;
+    return copy;
+}
+
 Type *pointer_to(Type *base) {
     Type *type = calloc(1, sizeof(Type));
 

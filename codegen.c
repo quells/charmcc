@@ -313,6 +313,19 @@ void codegen(Function *prog) {
             fn->name,
             fn->stack_size);
 
+        if (fn->params) {
+            // Save passed-by-register arguments to stack
+            int i = 0;
+            printf("  push  {");
+            for (Obj *var = fn->params; var; var = var->next) {
+                if (i > 0) {
+                    printf(", ");
+                }
+                printf("r%d", i++);
+            }
+            printf("}\n");
+        }
+
         gen_stmt(fn->body);
         assert(depth == 0);
 

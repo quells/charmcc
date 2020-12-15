@@ -135,6 +135,13 @@ static char *get_ident(Token *tok) {
     return strndup(tok->loc, tok->len);
 }
 
+static void create_param_lvars(Type *param) {
+    if (param) {
+        create_param_lvars(param->next);
+        new_lvar(get_ident(param->name), param);
+    }
+}
+
 // Find local variable by name.
 static Obj *find_var(Token *tok) {
     for (Obj *var = locals; var; var = var->next) {
@@ -167,11 +174,29 @@ static Type *typespec(Token **rest, Token *tok) {
     return ty_int;
 }
 
-// type-suffix :: ("(" func-params)?
+// type-suffix :: ("(" func-params? ")")?
+// func-params :: param ("," param)*
+// param       :: typespec declarator
 static Type *type_suffix(Token **rest, Token *tok, Type *type) {
     if (equal(tok, "(")) {
-        *rest = skip(tok->next, ")");
-        return func_type(type);
+        tok = tok->next;
+
+        Type head = {};
+        Type *cur = &head;
+
+        while (!equal(tok, ")")) {
+            if (cur != &head) {
+                tok = skip(tok, ",");
+            }
+            Type *base_type = typespec(&tok, tok);
+            Type *t = declarator(&tok, tok, base_type);
+            cur = cur->next = copy_type(t);
+        }
+
+        type = func_type(type);
+        type->params = head.next;
+        *rest = tok->next;
+        return type;
     }
 
     *rest = tok;
@@ -584,6 +609,8 @@ static Function *function(Token **rest, Token *tok) {
     Function *fn = calloc(1, sizeof(Function));
     fn->name = get_ident(type->name);
     fn->type = type;
+    create_param_lvars(type->params);
+    fn->params = locals;
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc func  %p %s\n", fn, fn->name);
