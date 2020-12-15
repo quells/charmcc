@@ -1,6 +1,7 @@
 #include "charmcc.h"
 
 static int depth;
+static Function *current_fn;
 
 static void gen_expr(Node *node);
 
@@ -171,12 +172,14 @@ static void gen_expr(Node *node) {
 }
 
 static void assign_lvar_offsets(Function *prog) {
-    int offset = 4;
-    for (Obj *var = prog->locals; var; var = var->next) {
-        offset += 4;
-        var->offset = offset;
+    for (Function *fn = prog; fn; fn = fn->next) {
+        int offset = 4;
+        for (Obj *var = fn->locals; var; var = var->next) {
+            offset += 4;
+            var->offset = offset;
+        }
+        fn->stack_size = align_to(offset, 16);
     }
-    prog->stack_size = align_to(offset, 16);
 }
 
 static void gen_stmt(Node *node) {
@@ -221,7 +224,7 @@ static void gen_stmt(Node *node) {
         return;
     case ND_RETURN:
         gen_expr(node->lhs);
-        printf("  b     main.return\n");
+        printf("  b     %s.return\n", current_fn->name);
         return;
     case ND_EXPR_STMT:
         gen_expr(node->lhs);
@@ -293,24 +296,38 @@ static void gen_div(void) {
 }
 
 void codegen(Function *prog) {
+    bool contains_div = false;
+
     assign_lvar_offsets(prog);
 
-    printf(
-        ".global main\n\n"
-        "main:\n"
-        "  push  {fp, lr}\n"
-        "  add   fp, sp, #4\n"
-        "  sub   sp, sp, #%d\n", prog->stack_size);
+    for (Function *fn = prog; fn; fn = fn->next) {
+        current_fn = fn;
 
-    gen_stmt(prog->body);
-    assert(depth == 0);
+        printf(
+            ".global %s\n\n"
+            "%s:\n"
+            "  push  {fp, lr}\n"
+            "  add   fp, sp, #4\n"
+            "  sub   sp, sp, #%d\n",
+            fn->name,
+            fn->name,
+            fn->stack_size);
 
-    printf(
-        "main.return:\n"
-        "  sub   sp, fp, #4\n"
-        "  pop   {fp, pc}\n");
+        gen_stmt(fn->body);
+        assert(depth == 0);
 
-    if (contains(prog->body, ND_DIV)) {
+        printf(
+            "%s.return:\n"
+            "  sub   sp, fp, #4\n"
+            "  pop   {fp, pc}\n",
+            fn->name);
+        
+        if (!contains_div && contains(fn->body, ND_DIV)) {
+            contains_div = true;
+        }
+    }
+
+    if (contains_div) {
         gen_div();
     }
 }

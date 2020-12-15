@@ -121,4 +121,6 @@ assert 8  'int main() { return add(3, 5); }'
 assert 2  'int main() { return sub(5, 3); }'
 assert 10 'int main() { return add4(1, 2, 3, 4); }'
 
+assert 32 'int main() { return ret32(); } int ret32() { return 32; }'
+
 echo OK
