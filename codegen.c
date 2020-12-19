@@ -171,15 +171,13 @@ static void gen_expr(Node *node) {
     error_tok(node->repr, "invalid expression");
 }
 
-static void assign_lvar_offsets(Function *prog) {
-    for (Function *fn = prog; fn; fn = fn->next) {
-        int offset = 4;
-        for (Obj *var = fn->locals; var; var = var->next) {
-            offset += 4;
-            var->offset = offset;
-        }
-        fn->stack_size = align_to(offset, 16);
+static void assign_lvar_offsets(Function *fn) {
+    int offset = 4;
+    for (Obj *var = fn->locals; var; var = var->next) {
+        offset += 4;
+        var->offset = offset;
     }
+    fn->stack_size = align_to(offset, 16);
 }
 
 static void gen_stmt(Node *node) {
@@ -188,14 +186,14 @@ static void gen_stmt(Node *node) {
         int c = count();
         gen_expr(node->condition);
         printf("  cmp   r0, #0\n");
-        printf("  beq   main.if.else.%d\n", c);
+        printf("  beq   %s.if.else.%d\n", current_fn->name, c);
         gen_stmt(node->consequence);
-        printf("  b     main.if.end.%d\n", c);
-        printf("main.if.else.%d:\n", c);
+        printf("  b     %s.if.end.%d\n", current_fn->name, c);
+        printf("%s.if.else.%d:\n", current_fn->name, c);
         if (node->alternative) {
             gen_stmt(node->alternative);
         }
-        printf("main.if.end.%d:\n", c);
+        printf("%s.if.end.%d:\n", current_fn->name, c);
         return;
     }
     case ND_LOOP: {
@@ -203,18 +201,18 @@ static void gen_stmt(Node *node) {
         if (node->initialize) {
             gen_stmt(node->initialize);
         }
-        printf("main.loop.begin.%d:\n", c);
+        printf("%s.loop.begin.%d:\n", current_fn->name, c);
         if (node->condition) {
             gen_expr(node->condition);
             printf("  cmp   r0, #0\n");
-            printf("  beq   main.loop.end.%d\n", c);
+            printf("  beq   %s.loop.end.%d\n", current_fn->name, c);
         }
         gen_stmt(node->consequence);
         if (node->increment) {
             gen_expr(node->increment);
         }
-        printf("  b     main.loop.begin.%d\n", c);
-        printf("main.loop.end.%d:\n", c);
+        printf("  b     %s.loop.begin.%d\n", current_fn->name, c);
+        printf("%s.loop.end.%d:\n", current_fn->name, c);
         return;
     }
     case ND_BLOCK:
@@ -295,36 +293,47 @@ static void gen_div(void) {
         "  pop   {fp, pc}\n");
 }
 
-void codegen(Function *prog) {
-    bool contains_div = false;
+int gen_fn(Function *fn) {
+    current_fn = fn;
+    assign_lvar_offsets(fn);
 
-    assign_lvar_offsets(prog);
+    printf(
+        ".global %s\n\n"
+        "%s:\n"
+        "  push  {fp, lr}\n"
+        "  add   fp, sp, #4\n"
+        "  sub   sp, sp, #%d\n",
+        fn->name,
+        fn->name,
+        fn->stack_size);
+
+    if (fn->params) {
+        // Save passed-by-register arguments to stack
+        // str   r0, [fp, #-8]
+        int i = 0;
+        for (Obj *var = fn->params; var; var = var->next) {
+            assert(i < 4);
+            printf("  str   r%d, [fp, #-%d]\n", i++, var->offset);
+        }
+    }
+
+    gen_stmt(fn->body);
+    assert(depth == 0);
+
+    printf(
+        "%s.return:\n"
+        "  sub   sp, fp, #4\n"
+        "  pop   {fp, pc}\n",
+        fn->name);
+    
+    return contains(fn->body, ND_DIV);
+}
+
+void codegen(Function *prog) {
+    int contains_div = 0;
 
     for (Function *fn = prog; fn; fn = fn->next) {
-        current_fn = fn;
-
-        printf(
-            ".global %s\n\n"
-            "%s:\n"
-            "  push  {fp, lr}\n"
-            "  add   fp, sp, #4\n"
-            "  sub   sp, sp, #%d\n",
-            fn->name,
-            fn->name,
-            fn->stack_size);
-
-        gen_stmt(fn->body);
-        assert(depth == 0);
-
-        printf(
-            "%s.return:\n"
-            "  sub   sp, fp, #4\n"
-            "  pop   {fp, pc}\n",
-            fn->name);
-        
-        if (!contains_div && contains(fn->body, ND_DIV)) {
-            contains_div = true;
-        }
+        contains_div = gen_fn(fn);
     }
 
     if (contains_div) {

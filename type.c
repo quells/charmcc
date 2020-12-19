@@ -9,6 +9,16 @@ void free_type(Type *t) {
 
     switch (t->kind) {
         case TY_INT:
+            if (t == ty_int) {
+                #if DEBUG_ALLOCS
+                fprintf(stderr, "skip free int type %p\n", t);
+                #endif
+            } else {
+                #if DEBUG_ALLOCS
+                fprintf(stderr, "free  int   %p\n", t);
+                #endif
+                free(t);
+            }
             break;
         case TY_PTR:
             #if DEBUG_ALLOCS
@@ -32,6 +42,17 @@ void free_type(Type *t) {
 
 bool is_integer(Type *type) {
     return type->kind == TY_INT;
+}
+
+Type *copy_type(Type *type) {
+    Type *copy = calloc(1, sizeof(Type));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc copy of type %p\n", type);
+    #endif
+
+    *copy = *type;
+    return copy;
 }
 
 Type *pointer_to(Type *base) {

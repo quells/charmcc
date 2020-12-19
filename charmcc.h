@@ -85,6 +85,7 @@ typedef struct Function Function;
 struct Function {
     Function *next;
     char *name;
+    Obj *params;
     Type *type;
     Node *body;
     Obj *locals;
@@ -133,12 +134,17 @@ struct Type {
     TypeKind kind;
     Type *base;
     Token *name;
+
+    // Only if kind == TY_FUNC
     Type *return_type;
+    Type *params;
+    Type *next;
 };
 
 extern Type *ty_int;
 
 bool is_integer(Type *type);
+Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
 void add_type(Node *node);
