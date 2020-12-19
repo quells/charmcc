@@ -9,6 +9,16 @@ void free_type(Type *t) {
 
     switch (t->kind) {
         case TY_INT:
+            if (t == ty_int) {
+                #if DEBUG_ALLOCS
+                fprintf(stderr, "skip free int type %p\n", t);
+                #endif
+            } else {
+                #if DEBUG_ALLOCS
+                fprintf(stderr, "free  int   %p\n", t);
+                #endif
+                free(t);
+            }
             break;
         case TY_PTR:
             #if DEBUG_ALLOCS
