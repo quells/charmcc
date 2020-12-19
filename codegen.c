@@ -298,12 +298,10 @@ int gen_fn(Function *fn) {
     assign_lvar_offsets(fn);
 
     printf(
-        ".global %s\n\n"
         "%s:\n"
         "  push  {fp, lr}\n"
         "  add   fp, sp, #4\n"
         "  sub   sp, sp, #%d\n",
-        fn->name,
         fn->name,
         fn->stack_size);
 
@@ -323,7 +321,7 @@ int gen_fn(Function *fn) {
     printf(
         "%s.return:\n"
         "  sub   sp, fp, #4\n"
-        "  pop   {fp, pc}\n",
+        "  pop   {fp, pc}\n\n",
         fn->name);
     
     return contains(fn->body, ND_DIV);
@@ -332,6 +330,10 @@ int gen_fn(Function *fn) {
 void codegen(Function *prog) {
     int contains_div = 0;
 
+    for (Function *fn = prog; fn; fn = fn->next) {
+        printf(".global %s\n", fn->name);
+    }
+    printf("\n");
     for (Function *fn = prog; fn; fn = fn->next) {
         contains_div = gen_fn(fn);
     }
