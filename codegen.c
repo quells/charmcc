@@ -10,8 +10,8 @@ static int count(void) {
     return i++;
 }
 
-static void push(void) {
-    printf("  push  {r0}\n");
+static void push(int r) {
+    printf("  push  {r%d}\n", r);
     depth++;
 }
 
@@ -89,7 +89,7 @@ static void gen_expr(Node *node) {
         return;
     case ND_ASSIGN:
         gen_addr(node->lhs);
-        push();
+        push(0);
         gen_expr(node->rhs);
         pop("r1");
         printf("  str   r0, [r1]\n");
@@ -98,7 +98,7 @@ static void gen_expr(Node *node) {
         int nargs = 0;
         for (Node *arg = node->args; arg; arg = arg->next) {
             gen_expr(arg);
-            push();
+            push(0);
             nargs++;
         }
 
@@ -117,7 +117,7 @@ static void gen_expr(Node *node) {
     }
 
     gen_expr(node->rhs);
-    push();
+    push(0);
     gen_expr(node->lhs);
     pop("r1");
 
@@ -132,7 +132,7 @@ static void gen_expr(Node *node) {
         printf("  mul   r0, r0, r1\n");
         return;
     case ND_DIV:
-        printf("  bl    div\n");
+        printf("  bl    __div\n");
         return;
     case ND_EQ:
     case ND_NEQ:
@@ -253,27 +253,27 @@ References:
   http://www.tofla.iconbar.com/tofla/arm/arm02/index.htm
 */
 static void gen_div(void) {
-    printf("\ndiv:\n"
+    printf("__div:\n"
         "  push  {fp, lr}\n"
         "  add   fp, sp, #4\n");
     printf(
         // check for divide by zero
         // @TODO: jump to some sort of panic routine
         "  cmp   r1, #0\n"
-        "  beq   div_end\n"
+        "  beq   __div_end\n"
         "  push  {r0, r1}\n"
         // variables
         "  mov   r0, #0\n"         // quotient
         "  pop   {r1, r2}\n"       // dividend / remainder, divisor
         "  mov   r3, #1\n"         // bit field
-        "div_shift:\n"
+        "__div_shift:\n"
         // shift divisor left until it exceeds dividend
         // the bit field will be shifted by one less
         "  cmp   r2, r1\n"
         "  lslls r2, r2, #1\n"
         "  lslls r3, r3, #1\n"
-        "  bls   div_shift\n"
-        "div_sub:\n"
+        "  bls   __div_shift\n"
+        "__div_sub:\n"
         // cmp sets the carry flag if r1 - r2 is positive, which is weird
         "  cmp   r1, r2\n"
         // subtract divisor from the remainder if it was smaller
@@ -286,9 +286,9 @@ static void gen_div(void) {
         // shift divisor right if bit field has not underflowed
         "  lsrcc r2, r2, #1\n"
         // loop if bit field has not underflowed
-        "  bcc   div_sub\n");
+        "  bcc   __div_sub\n");
     printf(
-        "div_end:\n"
+        "__div_end:\n"
         "  sub   sp, fp, #4\n"
         "  pop   {fp, pc}\n");
 }
