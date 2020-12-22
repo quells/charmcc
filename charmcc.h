@@ -127,13 +127,23 @@ Type Checker
 typedef enum {
     TY_INT,
     TY_PTR,
+    TY_ARRAY,
     TY_FUNC,
 } TypeKind;
 
 struct Type {
     TypeKind kind;
-    Type *base;
+
+    // sizeof() value
+    int size;
+
     Token *name;
+
+    // Only if kind == TY_PTR or TY_ARRAY
+    Type *base;
+
+    // Only if kind == TY_ARRAY
+    int array_len;
 
     // Only if kind == TY_FUNC
     Type *return_type;
@@ -147,6 +157,7 @@ bool is_integer(Type *type);
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
+Type *array_of(Type *base, int size);
 void add_type(Node *node);
 void free_type(Type *type);
 

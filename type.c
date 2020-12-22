@@ -1,6 +1,6 @@
 #include "charmcc.h"
 
-Type *ty_int = &(Type){TY_INT};
+Type *ty_int = &(Type){TY_INT, 4}; // signed 32-bit integer
 
 void free_type(Type *t) {
     if (t == NULL) return;
@@ -34,6 +34,13 @@ void free_type(Type *t) {
             free_type(t->base);
             free(t);
             break;
+        case TY_ARRAY:
+            #if DEBUG_ALLOCS
+            fprintf(stderr, "free  array %p of %p\n", t, t->base);
+            #endif
+            free_type(t->base);
+            free(t);
+            break;
         default:
             // ignore previously freed types
             break;
@@ -63,6 +70,7 @@ Type *pointer_to(Type *base) {
     #endif
 
     type->kind = TY_PTR;
+    type->size = PTR_SIZE;
     type->base = base;
     return type;
 }
@@ -76,6 +84,20 @@ Type *func_type(Type *return_type) {
 
     type->kind = TY_FUNC;
     type->return_type = return_type;
+    return type;
+}
+
+Type *array_of(Type *base, int len) {
+    Type *type = calloc(1, sizeof(Type));
+
+    #if DEBUG_ALLOCS
+    fprintf(stderr, "alloc array %p of %p\n", type, base);
+    #endif
+
+    type->kind = TY_ARRAY;
+    type->size = base->size * len;
+    type->base = base;
+    type->array_len = len;
     return type;
 }
 
@@ -102,7 +124,12 @@ void add_type(Node *node) {
     case ND_MUL:
     case ND_DIV:
     case ND_NEG:
+        node->type = node->lhs->type;
+        return;
     case ND_ASSIGN:
+        if (node->lhs->type->kind == TY_ARRAY) {
+            error_tok(node->lhs->repr, "not an lvalue");
+        }
         node->type = node->lhs->type;
         return;
     case ND_EQ:
@@ -117,10 +144,14 @@ void add_type(Node *node) {
         node->type = node->var->type;
         return;
     case ND_ADDR:
-        node->type = pointer_to(node->lhs->type);
+        if (node->lhs->type->kind == TY_ARRAY) {
+            node->type = pointer_to(node->lhs->type->base);
+        } else {
+            node->type = pointer_to(node->lhs->type);
+        }
         return;
     case ND_DEREF:
-        if (node->lhs->type->kind != TY_PTR) {
+        if (!node->lhs->type->base) {
             error_tok(node->repr, "invalid pointer dereference");
         }
         node->type = node->lhs->type->base;

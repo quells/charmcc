@@ -103,14 +103,16 @@ static Obj *new_lvar(char *name, Type *type) {
     fprintf(stderr, "alloc obj   %p ", var);
     switch (type->kind) {
     case TY_INT:
-        fprintf(stderr, "int");
+        fprintf(stderr, "int\n");
         break;
-    case TY_PTR: {
-        fprintf(stderr, "ptr");
+    case TY_PTR:
+        fprintf(stderr, "ptr\n");
         break;
-    }
     case TY_FUNC:
-        fprintf(stderr, "func");
+        fprintf(stderr, "func\n");
+        break;
+    case TY_ARRAY:
+        fprintf(stderr, "array\n");
         break;
     }
     #endif
@@ -126,6 +128,13 @@ static Node *new_num(int val, Token *repr) {
     Node *node = new_node(ND_NUM, repr);
     node->val = val;
     return node;
+}
+
+static int get_number(Token *tok) {
+    if (tok->kind != TK_NUM) {
+        error_tok(tok, "expected a number");
+    }
+    return tok->val;
 }
 
 static char *get_ident(Token *tok) {
@@ -174,29 +183,39 @@ static Type *typespec(Token **rest, Token *tok) {
     return ty_int;
 }
 
-// type-suffix :: ("(" func-params? ")")?
 // func-params :: param ("," param)*
 // param       :: typespec declarator
+static Type *func_params(Token **rest, Token *tok, Type *type) {
+    Type head = {};
+    Type *cur = &head;
+
+    while (!equal(tok, ")")) {
+        if (cur != &head) {
+            tok = skip(tok, ",");
+        }
+        Type *base_type = typespec(&tok, tok);
+        Type *t = declarator(&tok, tok, base_type);
+        cur = cur->next = copy_type(t);
+    }
+
+    type = func_type(type);
+    type->params = head.next;
+    *rest = tok->next;
+    return type;
+}
+
+// type-suffix :: "(" func-params
+//              | "[" num "]"
+//              | ()
 static Type *type_suffix(Token **rest, Token *tok, Type *type) {
     if (equal(tok, "(")) {
-        tok = tok->next;
+        return func_params(rest, tok->next, type);
+    }
 
-        Type head = {};
-        Type *cur = &head;
-
-        while (!equal(tok, ")")) {
-            if (cur != &head) {
-                tok = skip(tok, ",");
-            }
-            Type *base_type = typespec(&tok, tok);
-            Type *t = declarator(&tok, tok, base_type);
-            cur = cur->next = copy_type(t);
-        }
-
-        type = func_type(type);
-        type->params = head.next;
-        *rest = tok->next;
-        return type;
+    if (equal(tok, "[")) {
+        int size = get_number(tok->next);
+        *rest = skip(tok->next->next, "]");
+        return array_of(type, size);
     }
 
     *rest = tok;
@@ -439,7 +458,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
         rhs = tmp;
     }
 
-    rhs = new_binary(ND_MUL, rhs, new_num(PTR_SIZE, tok), tok);
+    rhs = new_binary(ND_MUL, rhs, new_num(lhs->type->base->size, tok), tok);
     return new_binary(ND_ADD, lhs, rhs, tok);
 }
 
@@ -461,7 +480,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
     }
 
     if (lhs->type->base && is_integer(rhs->type)) {
-        rhs = new_binary(ND_MUL, rhs, new_num(PTR_SIZE, tok), tok);
+        rhs = new_binary(ND_MUL, rhs, new_num(lhs->type->base->size, tok), tok);
         Node *node = new_binary(ND_SUB, lhs, rhs, tok);
         node->type = lhs->type;
         return node;
@@ -470,7 +489,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
     if (lhs->type->base && rhs->type->base) {
         Node *node = new_binary(ND_SUB, lhs, rhs, tok);
         node->type = ty_int;
-        return new_binary(ND_DIV, node, new_num(PTR_SIZE, tok), tok);
+        return new_binary(ND_DIV, node, new_num(lhs->type->base->size, tok), tok);
     }
 
     error_tok(tok, "invalid operands");

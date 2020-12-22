@@ -20,6 +20,21 @@ static void pop(char *arg) {
     depth--;
 }
 
+static void load(Type *type, int r) {
+    if (type->kind == TY_ARRAY) {
+        // cannot load an array into a register
+        // references to the array are pointers to the first element
+        return;
+    }
+
+    printf("  ldr   r%d, [r%d]\n", r, r);
+}
+
+static void store(void) {
+    pop("r1");
+    printf("  str   r0, [r1]\n");
+}
+
 /*
 Round up `n` to the nearest multiple of `align`.
 For example, align_to(5, 8) == 8 and align_to(11, 8) == 16.
@@ -78,21 +93,20 @@ static void gen_expr(Node *node) {
         return;
     case ND_VAR:
         gen_addr(node);
-        printf("  ldr   r0, [r0]\n");
+        load(node->type, 0);
         return;
     case ND_ADDR:
         gen_addr(node->lhs);
         return;
     case ND_DEREF:
         gen_expr(node->lhs);
-        printf("  ldr   r0, [r0]\n");
+        load(node->type, 0);
         return;
     case ND_ASSIGN:
         gen_addr(node->lhs);
         push(0);
         gen_expr(node->rhs);
-        pop("r1");
-        printf("  str   r0, [r1]\n");
+        store();
         return;
     case ND_FN_CALL: {
         int nargs = 0;
@@ -172,9 +186,9 @@ static void gen_expr(Node *node) {
 }
 
 static void assign_lvar_offsets(Function *fn) {
-    int offset = 4;
+    int offset = PTR_SIZE;
     for (Obj *var = fn->locals; var; var = var->next) {
-        offset += 4;
+        offset += var->type->size;
         var->offset = offset;
     }
     fn->stack_size = align_to(offset, 16);
