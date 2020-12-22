@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define PTR_SIZE 4
-#define DEBUG_ALLOCS 0
+#define DEBUG_ALLOCS 1
 
 /*---------
 == Lexer ==

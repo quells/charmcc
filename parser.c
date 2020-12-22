@@ -604,6 +604,7 @@ static Node *fn_call(Token **rest, Token *tok) {
 }
 
 // primary :: "(" expr ")"
+//          | "sizeof" unary
 //          | ident fn-args?
 //          | num
 static Node *primary(Token **rest, Token *tok) {
@@ -611,6 +612,12 @@ static Node *primary(Token **rest, Token *tok) {
         Node *node = expr(&tok, tok->next);
         *rest = skip(tok, ")");
         return node;
+    }
+
+    if (equal(tok, "sizeof")) {
+        Node *node = unary(rest, tok->next);
+        add_type(node);
+        return new_num(node->type->size, tok);
     }
 
     if (tok->kind == TK_IDENT) {
