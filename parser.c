@@ -617,7 +617,9 @@ static Node *primary(Token **rest, Token *tok) {
     if (equal(tok, "sizeof")) {
         Node *node = unary(rest, tok->next);
         add_type(node);
-        return new_num(node->type->size, tok);
+        Node *size = new_num(node->type->size, tok);
+        free_node(node);
+        return size;
     }
 
     if (tok->kind == TK_IDENT) {
