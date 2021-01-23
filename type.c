@@ -51,8 +51,8 @@ bool is_integer(Type *type) {
     return type->kind == TY_INT;
 }
 
-Type *copy_type(Type *type) {
-    Type *copy = calloc(1, sizeof(Type));
+Type *copy_type(Type *type, GC *gc) {
+    Type *copy = allocate(gc, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc copy of type %p\n", type);
@@ -62,8 +62,8 @@ Type *copy_type(Type *type) {
     return copy;
 }
 
-Type *pointer_to(Type *base) {
-    Type *type = calloc(1, sizeof(Type));
+Type *pointer_to(Type *base, GC *gc) {
+    Type *type = allocate(gc, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc ptrty %p\n", type);
@@ -75,8 +75,8 @@ Type *pointer_to(Type *base) {
     return type;
 }
 
-Type *func_type(Type *return_type) {
-    Type *type = calloc(1, sizeof(Type));
+Type *func_type(Type *return_type, GC *gc) {
+    Type *type = allocate(gc, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc fn ty %p\n", type);
@@ -87,8 +87,8 @@ Type *func_type(Type *return_type) {
     return type;
 }
 
-Type *array_of(Type *base, int len) {
-    Type *type = calloc(1, sizeof(Type));
+Type *array_of(Type *base, int len, GC *gc) {
+    Type *type = allocate(gc, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc array %p of %p\n", type, base);
@@ -101,21 +101,21 @@ Type *array_of(Type *base, int len) {
     return type;
 }
 
-void add_type(Node *node) {
+void add_type(Node *node, GC *gc) {
     if (!node || node->type) {
         return;
     }
 
-    add_type(node->lhs);
-    add_type(node->rhs);
-    add_type(node->condition);
-    add_type(node->consequence);
-    add_type(node->alternative);
-    add_type(node->initialize);
-    add_type(node->increment);
+    add_type(node->lhs, gc);
+    add_type(node->rhs, gc);
+    add_type(node->condition, gc);
+    add_type(node->consequence, gc);
+    add_type(node->alternative, gc);
+    add_type(node->initialize, gc);
+    add_type(node->increment, gc);
 
     for (Node *n = node->body; n; n = n->next) {
-        add_type(n);
+        add_type(n, gc);
     }
 
     switch (node->kind) {
@@ -145,9 +145,9 @@ void add_type(Node *node) {
         return;
     case ND_ADDR:
         if (node->lhs->type->kind == TY_ARRAY) {
-            node->type = pointer_to(node->lhs->type->base);
+            node->type = pointer_to(node->lhs->type->base, gc);
         } else {
-            node->type = pointer_to(node->lhs->type);
+            node->type = pointer_to(node->lhs->type, gc);
         }
         return;
     case ND_DEREF:

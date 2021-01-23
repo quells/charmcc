@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define PTR_SIZE 4
-#define DEBUG_ALLOCS 1
+#define DEBUG_ALLOCS 0
 
 /*---------
 == Lexer ==
@@ -39,6 +39,19 @@ Token *skip(Token *tok, char *op);
 bool consume(Token **rest, Token *tok, char *str);
 Token *tokenize(char *input);
 void free_tokens(Token *tok);
+
+/*------------------
+== Garbage Collector
+------------------*/
+
+typedef struct GC GC;
+struct GC {
+    GC *next;
+    void *obj;
+};
+
+void *allocate(GC *gc, size_t size);
+void cleanup(GC *gc);
 
 /*----------
 == Parser ==
@@ -117,8 +130,7 @@ struct Node {
     int val;    // Only if kind == ND_NUM
 };
 
-Function *parse(Token *tok);
-void free_ast(Function *prog);
+Function *parse(Token *tok, GC *gc);
 
 /*----------
 Type Checker
@@ -154,12 +166,11 @@ struct Type {
 extern Type *ty_int;
 
 bool is_integer(Type *type);
-Type *copy_type(Type *type);
-Type *pointer_to(Type *base);
-Type *func_type(Type *return_type);
-Type *array_of(Type *base, int size);
-void add_type(Node *node);
-void free_type(Type *type);
+Type *copy_type(Type *type, GC *gc);
+Type *pointer_to(Type *base, GC *gc);
+Type *func_type(Type *return_type, GC *gc);
+Type *array_of(Type *base, int size, GC *gc);
+void add_type(Node *node, GC *gc);
 
 /*------------
 == Code Gen ==
