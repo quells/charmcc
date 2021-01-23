@@ -18,10 +18,16 @@ void *allocate(GC *gc, size_t size) {
 void cleanup(GC *gc) {
     if (gc == NULL) return;
     if (gc->obj != NULL) {
+        #if DEBUG_ALLOCS
+        printf("free %p\n", gc->obj);
+        #endif
         free(gc->obj);
+        gc->obj = NULL;
     }
     if (gc->next != NULL) {
         cleanup(gc->next);
         free(gc->next);
+        gc->next = NULL;
     }
+    gc->tail = NULL;
 }

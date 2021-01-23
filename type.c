@@ -2,51 +2,6 @@
 
 Type *ty_int = &(Type){TY_INT, 4}; // signed 32-bit integer
 
-void free_type(Type *t) {
-    if (t == NULL) return;
-
-    free_type(t->return_type);
-
-    switch (t->kind) {
-        case TY_INT:
-            if (t == ty_int) {
-                #if DEBUG_ALLOCS
-                fprintf(stderr, "skip free int type %p\n", t);
-                #endif
-            } else {
-                #if DEBUG_ALLOCS
-                fprintf(stderr, "free  int   %p\n", t);
-                #endif
-                free(t);
-            }
-            break;
-        case TY_PTR:
-            #if DEBUG_ALLOCS
-            fprintf(stderr, "free  ptrty %p\n", t);
-            #endif
-            free_type(t->base);
-            free(t);
-            break;
-        case TY_FUNC:
-            #if DEBUG_ALLOCS
-            fprintf(stderr, "free  fn ty %p\n", t);
-            #endif
-            free_type(t->base);
-            free(t);
-            break;
-        case TY_ARRAY:
-            #if DEBUG_ALLOCS
-            fprintf(stderr, "free  array %p of %p\n", t, t->base);
-            #endif
-            free_type(t->base);
-            free(t);
-            break;
-        default:
-            // ignore previously freed types
-            break;
-    }
-}
-
 bool is_integer(Type *type) {
     return type->kind == TY_INT;
 }
