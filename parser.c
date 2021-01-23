@@ -3,8 +3,8 @@
 // All local variable instances found during parsing.
 Obj *locals;
 
-static Node *new_node(NodeKind kind, Token *repr) {
-    Node *node = calloc(1, sizeof(Node));
+static Node *new_node(NodeKind kind, Token *repr, MemManager *mm) {
+    Node *node = allocate(mm, sizeof(Node));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc node  %p ", node);
@@ -77,27 +77,27 @@ static Node *new_node(NodeKind kind, Token *repr) {
     return node;
 }
 
-static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *repr) {
-    Node *node = new_node(kind, repr);
+static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *repr, MemManager *mm) {
+    Node *node = new_node(kind, repr, mm);
     node->lhs = lhs;
     node->rhs = rhs;
     return node;
 }
 
-static Node *new_unary(NodeKind kind, Node *expr, Token *repr) {
-    Node *node = new_node(kind, repr);
+static Node *new_unary(NodeKind kind, Node *expr, Token *repr, MemManager *mm) {
+    Node *node = new_node(kind, repr, mm);
     node->lhs = expr;
     return node;
 }
 
-static Node *new_var(Obj *var, Token *repr) {
-    Node *node = new_node(ND_VAR, repr);
+static Node *new_var(Obj *var, Token *repr, MemManager *mm) {
+    Node *node = new_node(ND_VAR, repr, mm);
     node->var = var;
     return node;
 }
 
-static Obj *new_lvar(char *name, Type *type) {
-    Obj *var = calloc(1, sizeof(Obj));
+static Obj *new_lvar(char *name, Type *type, MemManager *mm) {
+    Obj *var = allocate(mm, sizeof(Obj));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc obj   %p ", var);
@@ -124,8 +124,8 @@ static Obj *new_lvar(char *name, Type *type) {
     return var;
 }
 
-static Node *new_num(int val, Token *repr) {
-    Node *node = new_node(ND_NUM, repr);
+static Node *new_num(int val, Token *repr, MemManager *mm) {
+    Node *node = new_node(ND_NUM, repr, mm);
     node->val = val;
     return node;
 }
@@ -137,17 +137,19 @@ static int get_number(Token *tok) {
     return tok->val;
 }
 
-static char *get_ident(Token *tok) {
+static char *get_ident(Token *tok, MemManager *mm) {
     if (tok->kind != TK_IDENT) {
         error_tok(tok, "expected an identifier");
     }
-    return strndup(tok->loc, tok->len);
+    char *copy = strndup(tok->loc, tok->len);
+    register_obj(mm, copy);
+    return copy;
 }
 
-static void create_param_lvars(Type *param) {
+static void create_param_lvars(Type *param, MemManager *mm) {
     if (param) {
-        create_param_lvars(param->next);
-        new_lvar(get_ident(param->name), param);
+        create_param_lvars(param->next, mm);
+        new_lvar(get_ident(param->name, mm), param, mm);
     }
 }
 
@@ -163,20 +165,20 @@ static Obj *find_var(Token *tok) {
 }
 
 static Type *typespec(Token **rest, Token *tok);
-static Type *declarator(Token **rest, Token *tok, Type *type);
-static Node *declaration(Token **rest, Token *tok);
-static Node *compound_stmt(Token **rest, Token *tok);
-static Node *stmt(Token **rest, Token *tok);
-static Node *expr_stmt(Token **rest, Token *tok);
-static Node *expr(Token **rest, Token *tok);
-static Node *assign(Token **rest, Token *tok);
-static Node *equality(Token **rest, Token *tok);
-static Node *relational(Token **rest, Token *tok);
-static Node *add(Token **rest, Token *tok);
-static Node *mul(Token **rest, Token *tok);
-static Node *postfix(Token **rest, Token *tok);
-static Node *unary(Token **rest, Token *tok);
-static Node *primary(Token **rest, Token *tok);
+static Type *declarator(Token **rest, Token *tok, Type *type, MemManager *mm);
+static Node *declaration(Token **rest, Token *tok, MemManager *mm);
+static Node *compound_stmt(Token **rest, Token *tok, MemManager *mm);
+static Node *stmt(Token **rest, Token *tok, MemManager *mm);
+static Node *expr_stmt(Token **rest, Token *tok, MemManager *mm);
+static Node *expr(Token **rest, Token *tok, MemManager *mm);
+static Node *assign(Token **rest, Token *tok, MemManager *mm);
+static Node *equality(Token **rest, Token *tok, MemManager *mm);
+static Node *relational(Token **rest, Token *tok, MemManager *mm);
+static Node *add(Token **rest, Token *tok, MemManager *mm);
+static Node *mul(Token **rest, Token *tok, MemManager *mm);
+static Node *postfix(Token **rest, Token *tok, MemManager *mm);
+static Node *unary(Token **rest, Token *tok, MemManager *mm);
+static Node *primary(Token **rest, Token *tok, MemManager *mm);
 
 // typespec :: "int"
 static Type *typespec(Token **rest, Token *tok) {
@@ -186,7 +188,7 @@ static Type *typespec(Token **rest, Token *tok) {
 
 // func-params :: param ("," param)*
 // param       :: typespec declarator
-static Type *func_params(Token **rest, Token *tok, Type *type) {
+static Type *func_params(Token **rest, Token *tok, Type *type, MemManager *mm) {
     Type head = {};
     Type *cur = &head;
 
@@ -195,11 +197,11 @@ static Type *func_params(Token **rest, Token *tok, Type *type) {
             tok = skip(tok, ",");
         }
         Type *base_type = typespec(&tok, tok);
-        Type *t = declarator(&tok, tok, base_type);
-        cur = cur->next = copy_type(t);
+        Type *t = declarator(&tok, tok, base_type, mm);
+        cur = cur->next = copy_type(t, mm);
     }
 
-    type = func_type(type);
+    type = func_type(type, mm);
     type->params = head.next;
     *rest = tok->next;
     return type;
@@ -208,16 +210,16 @@ static Type *func_params(Token **rest, Token *tok, Type *type) {
 // type-suffix :: "(" func-params
 //              | "[" num "]" type-suffix
 //              | nothing
-static Type *type_suffix(Token **rest, Token *tok, Type *type) {
+static Type *type_suffix(Token **rest, Token *tok, Type *type, MemManager *mm) {
     if (equal(tok, "(")) {
-        return func_params(rest, tok->next, type);
+        return func_params(rest, tok->next, type, mm);
     }
 
     if (equal(tok, "[")) {
         int size = get_number(tok->next);
         tok = skip(tok->next->next, "]");
-        type = type_suffix(rest, tok, type);
-        return array_of(type, size);
+        type = type_suffix(rest, tok, type, mm);
+        return array_of(type, size, mm);
     }
 
     *rest = tok;
@@ -225,22 +227,22 @@ static Type *type_suffix(Token **rest, Token *tok, Type *type) {
 }
 
 // declarator :: "*"* ident type-suffix
-static Type *declarator(Token **rest, Token *tok, Type *type) {
+static Type *declarator(Token **rest, Token *tok, Type *type, MemManager *mm) {
     while (consume(&tok, tok, "*")) {
-        type = pointer_to(type);
+        type = pointer_to(type, mm);
     }
 
     if (tok->kind != TK_IDENT) {
         error_tok(tok, "expected a variable name");
     }
 
-    type = type_suffix(rest, tok->next, type);
+    type = type_suffix(rest, tok->next, type, mm);
     type->name = tok;
     return type;
 }
 
 // declaration :: typespec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
-static Node *declaration(Token **rest, Token *tok) {
+static Node *declaration(Token **rest, Token *tok, MemManager *mm) {
     Type *base_type = typespec(&tok, tok);
 
     Node head = {};
@@ -252,38 +254,38 @@ static Node *declaration(Token **rest, Token *tok) {
             tok = skip(tok, ",");
         }
 
-        Type *type = declarator(&tok, tok, base_type);
-        Obj *var = new_lvar(get_ident(type->name), type);
+        Type *type = declarator(&tok, tok, base_type, mm);
+        Obj *var = new_lvar(get_ident(type->name, mm), type, mm);
 
         if (!equal(tok, "=")) {
             continue;
         }
 
-        Node *lhs = new_var(var, type->name);
-        Node *rhs = assign(&tok, tok->next);
-        Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
-        cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
+        Node *lhs = new_var(var, type->name, mm);
+        Node *rhs = assign(&tok, tok->next, mm);
+        Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok, mm);
+        cur = cur->next = new_unary(ND_EXPR_STMT, node, tok, mm);
     }
 
-    Node *node = new_node(ND_BLOCK, tok);
+    Node *node = new_node(ND_BLOCK, tok, mm);
     node->body = head.next;
     *rest = tok->next;
     return node;
 }
 
 // compound-stmt :: (declaration | stmt)* "}"
-static Node *compound_stmt(Token **rest, Token *tok) {
-    Node *node = new_node(ND_BLOCK, tok);
+static Node *compound_stmt(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = new_node(ND_BLOCK, tok, mm);
 
     Node head = {};
     Node *cur = &head;
     while (!equal(tok, "}")) {
         if (equal(tok, "int")) {
-            cur = cur->next = declaration(&tok, tok);
+            cur = cur->next = declaration(&tok, tok, mm);
         } else {
-            cur = cur->next = stmt(&tok, tok);
+            cur = cur->next = stmt(&tok, tok, mm);
         }
-        add_type(cur);
+        add_type(cur, mm);
     }
 
     node->body = head.next;
@@ -297,105 +299,105 @@ static Node *compound_stmt(Token **rest, Token *tok) {
 //       | "while" "(" expr ")" stmt
 //       | "{" compound-stmt
 //       | expr-stmt
-static Node *stmt(Token **rest, Token *tok) {
+static Node *stmt(Token **rest, Token *tok, MemManager *mm) {
     if (equal(tok, "return")) {
-        Node *node = new_node(ND_RETURN, tok);
-        node->lhs = expr(&tok, tok->next);
+        Node *node = new_node(ND_RETURN, tok, mm);
+        node->lhs = expr(&tok, tok->next, mm);
         *rest = skip(tok, ";");
         return node;
     }
 
     if (equal(tok, "if")) {
-        Node *node = new_node(ND_IF, tok);
+        Node *node = new_node(ND_IF, tok, mm);
         tok = skip(tok->next, "(");
-        node->condition = expr(&tok, tok);
+        node->condition = expr(&tok, tok, mm);
         tok = skip(tok, ")");
-        node->consequence = stmt(&tok, tok);
+        node->consequence = stmt(&tok, tok, mm);
         if (equal(tok, "else")) {
-            node->alternative = stmt(&tok, tok->next);
+            node->alternative = stmt(&tok, tok->next, mm);
         }
         *rest = tok;
         return node;
     }
 
     if (equal(tok, "for")) {
-        Node *node = new_node(ND_LOOP, tok);
+        Node *node = new_node(ND_LOOP, tok, mm);
         tok = skip(tok->next, "(");
 
-        node->initialize = expr_stmt(&tok, tok);
+        node->initialize = expr_stmt(&tok, tok, mm);
 
         if (!equal(tok, ";")) {
-            node->condition = expr(&tok, tok);
+            node->condition = expr(&tok, tok, mm);
         }
         tok = skip(tok, ";");
 
         if (!equal(tok, ")")) {
-            node->increment = expr(&tok, tok);
+            node->increment = expr(&tok, tok, mm);
         }
         tok = skip(tok, ")");
 
-        node->consequence = stmt(rest, tok);
+        node->consequence = stmt(rest, tok, mm);
         return node;
     }
 
     if (equal(tok, "while")) {
-        Node *node = new_node(ND_LOOP, tok);
+        Node *node = new_node(ND_LOOP, tok, mm);
         tok = skip(tok->next, "(");
-        node->condition = expr(&tok, tok);
+        node->condition = expr(&tok, tok, mm);
         tok = skip(tok, ")");
-        node->consequence = stmt(rest, tok);
+        node->consequence = stmt(rest, tok, mm);
         return node;
     }
 
     if (equal(tok, "{")) {
-        return compound_stmt(rest, tok->next);
+        return compound_stmt(rest, tok->next, mm);
     }
 
-    return expr_stmt(rest, tok);
+    return expr_stmt(rest, tok, mm);
 }
 
 // expr-stmt :: expr? ";"
-static Node *expr_stmt(Token **rest, Token *tok) {
+static Node *expr_stmt(Token **rest, Token *tok, MemManager *mm) {
     if (equal(tok, ";")) {
         *rest = tok->next;
-        return new_node(ND_BLOCK, tok);
+        return new_node(ND_BLOCK, tok, mm);
     }
 
-    Node *node = new_node(ND_EXPR_STMT, tok);
-    node->lhs = expr(&tok, tok);
+    Node *node = new_node(ND_EXPR_STMT, tok, mm);
+    node->lhs = expr(&tok, tok, mm);
     *rest = skip(tok, ";");
     return node;
 }
 
 // expr :: assign
-static Node *expr(Token **rest, Token *tok) {
-    return assign(rest, tok);
+static Node *expr(Token **rest, Token *tok, MemManager *mm) {
+    return assign(rest, tok, mm);
 }
 
 // assign :: equality ("=" assign)?
-static Node *assign(Token **rest, Token *tok) {
-    Node *node = equality(&tok, tok);
+static Node *assign(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = equality(&tok, tok, mm);
     if (equal(tok, "=")) {
-        node = new_binary(ND_ASSIGN, node, assign(&tok, tok->next), tok);
+        node = new_binary(ND_ASSIGN, node, assign(&tok, tok->next, mm), tok, mm);
     }
     *rest = tok;
     return node;
 }
 
 // equality :: relational ("==" relational | "!=" relational)*
-static Node *equality(Token **rest, Token *tok) {
-    Node *node = relational(&tok, tok);
+static Node *equality(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = relational(&tok, tok, mm);
 
     for (;;) {
         Token *start = tok;
 
         if (equal(tok, "==")) {
-            node = new_binary(ND_EQ, node, relational(&tok, tok->next), start);
+            node = new_binary(ND_EQ, node, relational(&tok, tok->next, mm), start, mm);
             continue;
         }
 
         if (equal(tok, "!=")) {
-            node = new_binary(ND_NEQ, node, relational(&tok, tok->next), start);
+            node = new_binary(ND_NEQ, node, relational(&tok, tok->next, mm), start, mm);
             continue;
         }
 
@@ -405,29 +407,29 @@ static Node *equality(Token **rest, Token *tok) {
 }
 
 // relational :: add ("<" add | "<=" add | ">" add | ">=" add)*
-static Node *relational(Token **rest, Token *tok) {
-    Node *node = add(&tok, tok);
+static Node *relational(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = add(&tok, tok, mm);
 
     for (;;) {
         Token *start = tok;
 
         if (equal(tok, "<")) {
-            node = new_binary(ND_LT, node, add(&tok, tok->next), start);
+            node = new_binary(ND_LT, node, add(&tok, tok->next, mm), start, mm);
             continue;
         }
 
         if (equal(tok, "<=")) {
-            node = new_binary(ND_LTE, node, add(&tok, tok->next), start);
+            node = new_binary(ND_LTE, node, add(&tok, tok->next, mm), start, mm);
             continue;
         }
 
         if (equal(tok, ">")) {
-            node = new_binary(ND_LT, add(&tok, tok->next), node, start);
+            node = new_binary(ND_LT, add(&tok, tok->next, mm), node, start, mm);
             continue;
         }
 
         if (equal(tok, ">=")) {
-            node = new_binary(ND_LTE, add(&tok, tok->next), node, start);
+            node = new_binary(ND_LTE, add(&tok, tok->next, mm), node, start, mm);
             continue;
         }
 
@@ -442,12 +444,12 @@ static Node *relational(Token **rest, Token *tok) {
 Moves the pointer by the size of the elements, not bytes.
 p+n :: p + sizeof(*p)*n
 */
-static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
-    add_type(lhs);
-    add_type(rhs);
+static Node *new_add(Node *lhs, Node *rhs, Token *tok, MemManager *mm) {
+    add_type(lhs, mm);
+    add_type(rhs, mm);
 
     if (is_integer(lhs->type) && is_integer(rhs->type)) {
-        return new_binary(ND_ADD, lhs, rhs, tok);
+        return new_binary(ND_ADD, lhs, rhs, tok, mm);
     }
 
     if (lhs->type->base && rhs->type->base) {
@@ -460,8 +462,8 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
         rhs = tmp;
     }
 
-    rhs = new_binary(ND_MUL, rhs, new_num(lhs->type->base->size, tok), tok);
-    return new_binary(ND_ADD, lhs, rhs, tok);
+    rhs = new_binary(ND_MUL, rhs, new_num(lhs->type->base->size, tok, mm), tok, mm);
+    return new_binary(ND_ADD, lhs, rhs, tok, mm);
 }
 
 /*
@@ -473,25 +475,25 @@ p-n :: p - sizeof(*p)*n
 The distance between two pointers, in units of the size of the elements.
 p-q :: (p<--->q) / sizeof(*p)
 */
-static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
-    add_type(lhs);
-    add_type(rhs);
+static Node *new_sub(Node *lhs, Node *rhs, Token *tok, MemManager *mm) {
+    add_type(lhs, mm);
+    add_type(rhs, mm);
 
     if (is_integer(lhs->type) && is_integer(rhs->type)) {
-        return new_binary(ND_SUB, lhs, rhs, tok);
+        return new_binary(ND_SUB, lhs, rhs, tok, mm);
     }
 
     if (lhs->type->base && is_integer(rhs->type)) {
-        rhs = new_binary(ND_MUL, rhs, new_num(lhs->type->base->size, tok), tok);
-        Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+        rhs = new_binary(ND_MUL, rhs, new_num(lhs->type->base->size, tok, mm), tok, mm);
+        Node *node = new_binary(ND_SUB, lhs, rhs, tok, mm);
         node->type = lhs->type;
         return node;
     }
 
     if (lhs->type->base && rhs->type->base) {
-        Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+        Node *node = new_binary(ND_SUB, lhs, rhs, tok, mm);
         node->type = ty_int;
-        return new_binary(ND_DIV, node, new_num(lhs->type->base->size, tok), tok);
+        return new_binary(ND_DIV, node, new_num(lhs->type->base->size, tok, mm), tok, mm);
     }
 
     error_tok(tok, "invalid operands");
@@ -499,19 +501,19 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
 }
 
 // add :: mul ("+" mul | "-" mul)*
-static Node *add(Token **rest, Token *tok) {
-    Node *node = mul(&tok, tok);
+static Node *add(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = mul(&tok, tok, mm);
 
     for (;;) {
         Token *start = tok;
 
         if (equal(tok, "+")) {
-            node = new_add(node, mul(&tok, tok->next), start);
+            node = new_add(node, mul(&tok, tok->next, mm), start, mm);
             continue;
         }
 
         if (equal(tok, "-")) {
-            node = new_sub(node, mul(&tok, tok->next), start);
+            node = new_sub(node, mul(&tok, tok->next, mm), start, mm);
             continue;
         }
 
@@ -521,19 +523,19 @@ static Node *add(Token **rest, Token *tok) {
 }
 
 // mul :: unary ("*" unary | "/" unary)*
-static Node *mul(Token **rest, Token *tok) {
-    Node *node = unary(&tok, tok);
+static Node *mul(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = unary(&tok, tok, mm);
 
     for (;;) {
         Token *start = tok;
 
         if (equal(tok, "*")) {
-            node = new_binary(ND_MUL, node, unary(&tok, tok->next), start);
+            node = new_binary(ND_MUL, node, unary(&tok, tok->next, mm), start, mm);
             continue;
         }
 
         if (equal(tok, "/")) {
-            node = new_binary(ND_DIV, node, unary(&tok, tok->next), start);
+            node = new_binary(ND_DIV, node, unary(&tok, tok->next, mm), start, mm);
             continue;
         }
 
@@ -544,36 +546,36 @@ static Node *mul(Token **rest, Token *tok) {
 
 // unary :: ("+" | "-" | "&" | "*") unary
 //        | postfix
-static Node *unary(Token **rest, Token *tok) {
+static Node *unary(Token **rest, Token *tok, MemManager *mm) {
     if (equal(tok, "+")) {
-        return unary(rest, tok->next);
+        return unary(rest, tok->next, mm);
     }
 
     if (equal(tok, "-")) {
-        return new_unary(ND_NEG, unary(rest, tok->next), tok);
+        return new_unary(ND_NEG, unary(rest, tok->next, mm), tok, mm);
     }
 
     if (equal(tok, "&")) {
-        return new_unary(ND_ADDR, unary(rest, tok->next), tok);
+        return new_unary(ND_ADDR, unary(rest, tok->next, mm), tok, mm);
     }
 
     if (equal(tok, "*")) {
-        return new_unary(ND_DEREF, unary(rest, tok->next), tok);
+        return new_unary(ND_DEREF, unary(rest, tok->next, mm), tok, mm);
     }
 
-    return postfix(rest, tok);
+    return postfix(rest, tok, mm);
 }
 
 // postfix = primary ("[" expr "]")*
-static Node *postfix(Token **rest, Token *tok) {
-    Node *node = primary(&tok, tok);
+static Node *postfix(Token **rest, Token *tok, MemManager *mm) {
+    Node *node = primary(&tok, tok, mm);
 
     while (equal(tok, "[")) {
         // x[y] is sugar for *(x + y)
         Token *start = tok;
-        Node *idx = expr(&tok, tok->next);
+        Node *idx = expr(&tok, tok->next, mm);
         tok = skip(tok, "]");
-        node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+        node = new_unary(ND_DEREF, new_add(node, idx, start, mm), start, mm);
     }
 
     *rest = tok;
@@ -581,7 +583,7 @@ static Node *postfix(Token **rest, Token *tok) {
 }
 
 // fn-call :: ident "(" (assign, ("," assign)*)? ")"
-static Node *fn_call(Token **rest, Token *tok) {
+static Node *fn_call(Token **rest, Token *tok, MemManager *mm) {
     Token *start = tok;
     tok = tok->next->next;
 
@@ -592,30 +594,38 @@ static Node *fn_call(Token **rest, Token *tok) {
         if (cur != &head) {
             tok = skip(tok, ",");
         }
-        cur = cur->next = assign(&tok, tok);
+        cur = cur->next = assign(&tok, tok, mm);
     }
 
     *rest = skip(tok, ")");
 
-    Node *node = new_node(ND_FN_CALL, start);
+    Node *node = new_node(ND_FN_CALL, start, mm);
     node->func = strndup(start->loc, start->len);
+    register_obj(mm, node->func);
     node->args = head.next;
     return node;
 }
 
 // primary :: "(" expr ")"
+//          | "sizeof" unary
 //          | ident fn-args?
 //          | num
-static Node *primary(Token **rest, Token *tok) {
+static Node *primary(Token **rest, Token *tok, MemManager *mm) {
     if (equal(tok, "(")) {
-        Node *node = expr(&tok, tok->next);
+        Node *node = expr(&tok, tok->next, mm);
         *rest = skip(tok, ")");
         return node;
     }
 
+    if (equal(tok, "sizeof")) {
+        Node *node = unary(rest, tok->next, mm);
+        add_type(node, mm);
+        return new_num(node->type->size, tok, mm);
+    }
+
     if (tok->kind == TK_IDENT) {
         if (equal(tok->next, "(")) {
-            return fn_call(rest, tok);
+            return fn_call(rest, tok, mm);
         }
 
         Obj *var = find_var(tok);
@@ -623,11 +633,11 @@ static Node *primary(Token **rest, Token *tok) {
             error_tok(tok, "undefined variable");
         }
         *rest = tok->next;
-        return new_var(var, tok);
+        return new_var(var, tok, mm);
     }
 
     if (tok->kind == TK_NUM) {
-        Node *node = new_num(tok->val, tok);
+        Node *node = new_num(tok->val, tok, mm);
         *rest = tok->next;
         return node;
     }
@@ -637,16 +647,16 @@ static Node *primary(Token **rest, Token *tok) {
 }
 
 // function-definition :: stmt*
-static Function *function(Token **rest, Token *tok) {
+static Function *function(Token **rest, Token *tok, MemManager *mm) {
     Type *type = typespec(&tok, tok);
-    type = declarator(&tok, tok, type);
+    type = declarator(&tok, tok, type, mm);
 
     locals = NULL;
 
-    Function *fn = calloc(1, sizeof(Function));
-    fn->name = get_ident(type->name);
+    Function *fn = allocate(mm, sizeof(Function));
+    fn->name = get_ident(type->name, mm);
     fn->type = type;
-    create_param_lvars(type->params);
+    create_param_lvars(type->params, mm);
     fn->params = locals;
 
     #if DEBUG_ALLOCS
@@ -654,154 +664,19 @@ static Function *function(Token **rest, Token *tok) {
     #endif
 
     tok = skip(tok, "{");
-    fn->body = compound_stmt(rest, tok);
+    fn->body = compound_stmt(rest, tok, mm);
     fn->locals = locals;
     return fn;
 }
 
 // program :: function-definition*
-Function *parse(Token *tok) {
+Function *parse(Token *tok, MemManager *mm) {
     Function head = {};
     Function *cur = &head;
 
     while (tok->kind != TK_EOF) {
-        cur = cur->next = function(&tok, tok);
+        cur = cur->next = function(&tok, tok, mm);
     }
 
     return head.next;
-}
-
-void free_obj(Obj *o) {
-    if (o == NULL) return;
-
-    free_obj(o->next);
-
-    #if DEBUG_ALLOCS
-    fprintf(stderr, "free  obj   %p ", o);
-    switch (o->type->kind) {
-    case TY_INT:
-        fprintf(stderr, "int");
-        break;
-    case TY_PTR: {
-        fprintf(stderr, "ptr");
-        break;
-    }
-    case TY_FUNC:
-        fprintf(stderr, "func");
-        break;
-    }
-    fprintf(stderr, " %s\n", o->name);
-    #endif
-
-    free(o->name);
-    free(o);
-}
-
-void free_node(Node *n) {
-    if (n == NULL) return;
-
-    free_node(n->next);
-    free_type(n->type);
-
-    free_node(n->lhs);
-    free_node(n->rhs);
-
-    free_node(n->condition);
-    free_node(n->consequence);
-    free_node(n->alternative);
-    free_node(n->initialize);
-    free_node(n->increment);
-
-    free_node(n->args);
-    free_node(n->body);
-
-    #if DEBUG_ALLOCS
-    fprintf(stderr, "free  node  %p ", n);
-    switch (n->kind) {
-    case ND_ADD:
-        fprintf(stderr, "add\n");
-        break;
-    case ND_SUB:
-        fprintf(stderr, "sub\n");
-        break;
-    case ND_MUL:
-        fprintf(stderr, "mul\n");
-        break;
-    case ND_DIV:
-        fprintf(stderr, "div\n");
-        break;
-    case ND_NEG:
-        fprintf(stderr, "neg\n");
-        break;
-    case ND_ADDR:
-        fprintf(stderr, "addr\n");
-        break;
-    case ND_DEREF:
-        fprintf(stderr, "deref\n");
-        break;
-    case ND_EQ:
-        fprintf(stderr, "eq\n");
-        break;
-    case ND_NEQ:
-        fprintf(stderr, "neq\n");
-        break;
-    case ND_LT:
-        fprintf(stderr, "lt\n");
-        break;
-    case ND_LTE:
-        fprintf(stderr, "lte\n");
-        break;
-    case ND_NUM:
-        fprintf(stderr, "num\n");
-        break;
-    case ND_ASSIGN:
-        fprintf(stderr, "assign\n");
-        break;
-    case ND_IF:
-        fprintf(stderr, "if\n");
-        break;
-    case ND_LOOP:
-        fprintf(stderr, "loop\n");
-        break;
-    case ND_RETURN:
-        fprintf(stderr, "return\n");
-        break;
-    case ND_BLOCK:
-        fprintf(stderr, "block\n");
-        break;
-    case ND_EXPR_STMT:
-        fprintf(stderr, "expr stmt\n");
-        break;
-    case ND_VAR:
-        fprintf(stderr, "var\n");
-        break;
-    case ND_FN_CALL:
-        fprintf(stderr, "fn call %s\n", n->func);
-        break;
-    }
-    #endif
-    
-    if (n->func != NULL) free(n->func);
-
-    free(n);
-}
-
-void free_function(Function *f) {
-    if (f == NULL) return;
-
-    free_function(f->next);
-    free_type(f->type);
-    free_node(f->body);
-    free_obj(f->locals);
-
-    #if DEBUG_ALLOCS
-    fprintf(stderr, "free  func  %p %s\n", f, f->name);
-    #endif
-
-    free(f->name);
-    free(f);
-}
-
-void free_ast(Function *prog) {
-    free_function(prog);
 }

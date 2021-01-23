@@ -88,18 +88,23 @@ static void gen_expr(Node *node) {
         printf("  mov   r0, #%d\n", node->val);
         return;
     case ND_NEG:
+        assert(node->lhs);
         gen_expr(node->lhs);
         printf("  neg   r0, r0\n");
         return;
     case ND_VAR:
         gen_addr(node);
+        assert(node->type);
         load(node->type, 0);
         return;
     case ND_ADDR:
+        assert(node->lhs);
         gen_addr(node->lhs);
         return;
     case ND_DEREF:
+        assert(node->lhs);
         gen_expr(node->lhs);
+        assert(node->type);
         load(node->type, 0);
         return;
     case ND_ASSIGN:

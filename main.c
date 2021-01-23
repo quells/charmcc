@@ -18,8 +18,9 @@ int main(int argc, char **argv) {
         }
     }
 
+    MemManager *mm = new_memmanager();
     Token *tok = tokenize(source);
-    Function *prog = parse(tok);
+    Function *prog = parse(tok, mm);
 
     if (debug) {
         debug_ast(prog);
@@ -28,7 +29,7 @@ int main(int argc, char **argv) {
     }
 
     free_tokens(tok);
-    free_ast(prog);
+    cleanup(mm);
 
     return 0;
 }
