@@ -6,8 +6,8 @@ bool is_integer(Type *type) {
     return type->kind == TY_INT;
 }
 
-Type *copy_type(Type *type, GC *gc) {
-    Type *copy = allocate(gc, sizeof(Type));
+Type *copy_type(Type *type, MemManager *mm) {
+    Type *copy = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc copy of type %p\n", type);
@@ -17,8 +17,8 @@ Type *copy_type(Type *type, GC *gc) {
     return copy;
 }
 
-Type *pointer_to(Type *base, GC *gc) {
-    Type *type = allocate(gc, sizeof(Type));
+Type *pointer_to(Type *base, MemManager *mm) {
+    Type *type = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc ptrty %p\n", type);
@@ -30,8 +30,8 @@ Type *pointer_to(Type *base, GC *gc) {
     return type;
 }
 
-Type *func_type(Type *return_type, GC *gc) {
-    Type *type = allocate(gc, sizeof(Type));
+Type *func_type(Type *return_type, MemManager *mm) {
+    Type *type = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc fn ty %p\n", type);
@@ -42,8 +42,8 @@ Type *func_type(Type *return_type, GC *gc) {
     return type;
 }
 
-Type *array_of(Type *base, int len, GC *gc) {
-    Type *type = allocate(gc, sizeof(Type));
+Type *array_of(Type *base, int len, MemManager *mm) {
+    Type *type = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc array %p of %p\n", type, base);
@@ -56,21 +56,21 @@ Type *array_of(Type *base, int len, GC *gc) {
     return type;
 }
 
-void add_type(Node *node, GC *gc) {
+void add_type(Node *node, MemManager *mm) {
     if (!node || node->type) {
         return;
     }
 
-    add_type(node->lhs, gc);
-    add_type(node->rhs, gc);
-    add_type(node->condition, gc);
-    add_type(node->consequence, gc);
-    add_type(node->alternative, gc);
-    add_type(node->initialize, gc);
-    add_type(node->increment, gc);
+    add_type(node->lhs, mm);
+    add_type(node->rhs, mm);
+    add_type(node->condition, mm);
+    add_type(node->consequence, mm);
+    add_type(node->alternative, mm);
+    add_type(node->initialize, mm);
+    add_type(node->increment, mm);
 
     for (Node *n = node->body; n; n = n->next) {
-        add_type(n, gc);
+        add_type(n, mm);
     }
 
     switch (node->kind) {
@@ -100,9 +100,9 @@ void add_type(Node *node, GC *gc) {
         return;
     case ND_ADDR:
         if (node->lhs->type->kind == TY_ARRAY) {
-            node->type = pointer_to(node->lhs->type->base, gc);
+            node->type = pointer_to(node->lhs->type->base, mm);
         } else {
-            node->type = pointer_to(node->lhs->type, gc);
+            node->type = pointer_to(node->lhs->type, mm);
         }
         return;
     case ND_DEREF:

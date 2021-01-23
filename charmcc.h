@@ -40,19 +40,21 @@ bool consume(Token **rest, Token *tok, char *str);
 Token *tokenize(char *input);
 void free_tokens(Token *tok);
 
-/*------------------
-== Garbage Collector
-------------------*/
+/*---------------------
+== Memory Management ==
+---------------------*/
 
-typedef struct GC GC;
-struct GC {
-    GC *next;
-    GC *tail;
+typedef struct MemManager MemManager;
+struct MemManager {
+    MemManager *next;
+    MemManager *tail;
     void *obj;
 };
 
-void *allocate(GC *gc, size_t size);
-void cleanup(GC *gc);
+MemManager *new_memmanager();
+void register_obj(MemManager *mm, void *obj);
+void *allocate(MemManager *mm, size_t size);
+void cleanup(MemManager *mm);
 
 /*----------
 == Parser ==
@@ -131,7 +133,7 @@ struct Node {
     int val;    // Only if kind == ND_NUM
 };
 
-Function *parse(Token *tok, GC *gc);
+Function *parse(Token *tok, MemManager *mm);
 
 /*----------
 Type Checker
@@ -167,11 +169,11 @@ struct Type {
 extern Type *ty_int;
 
 bool is_integer(Type *type);
-Type *copy_type(Type *type, GC *gc);
-Type *pointer_to(Type *base, GC *gc);
-Type *func_type(Type *return_type, GC *gc);
-Type *array_of(Type *base, int size, GC *gc);
-void add_type(Node *node, GC *gc);
+Type *copy_type(Type *type, MemManager *mm);
+Type *pointer_to(Type *base, MemManager *mm);
+Type *func_type(Type *return_type, MemManager *mm);
+Type *array_of(Type *base, int size, MemManager *mm);
+void add_type(Node *node, MemManager *mm);
 
 /*------------
 == Code Gen ==
