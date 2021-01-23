@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define PTR_SIZE 4
-#define DEBUG_ALLOCS 1
+#define DEBUG_ALLOCS 0
 
 /*---------
 == Lexer ==
@@ -39,6 +39,22 @@ Token *skip(Token *tok, char *op);
 bool consume(Token **rest, Token *tok, char *str);
 Token *tokenize(char *input);
 void free_tokens(Token *tok);
+
+/*---------------------
+== Memory Management ==
+---------------------*/
+
+typedef struct MemManager MemManager;
+struct MemManager {
+    MemManager *next;
+    MemManager *tail;
+    void *obj;
+};
+
+MemManager *new_memmanager();
+void register_obj(MemManager *mm, void *obj);
+void *allocate(MemManager *mm, size_t size);
+void cleanup(MemManager *mm);
 
 /*----------
 == Parser ==
@@ -117,8 +133,7 @@ struct Node {
     int val;    // Only if kind == ND_NUM
 };
 
-Function *parse(Token *tok);
-void free_ast(Function *prog);
+Function *parse(Token *tok, MemManager *mm);
 
 /*----------
 Type Checker
@@ -154,12 +169,11 @@ struct Type {
 extern Type *ty_int;
 
 bool is_integer(Type *type);
-Type *copy_type(Type *type);
-Type *pointer_to(Type *base);
-Type *func_type(Type *return_type);
-Type *array_of(Type *base, int size);
-void add_type(Node *node);
-void free_type(Type *type);
+Type *copy_type(Type *type, MemManager *mm);
+Type *pointer_to(Type *base, MemManager *mm);
+Type *func_type(Type *return_type, MemManager *mm);
+Type *array_of(Type *base, int size, MemManager *mm);
+void add_type(Node *node, MemManager *mm);
 
 /*------------
 == Code Gen ==

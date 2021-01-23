@@ -2,57 +2,12 @@
 
 Type *ty_int = &(Type){TY_INT, 4}; // signed 32-bit integer
 
-void free_type(Type *t) {
-    if (t == NULL) return;
-
-    free_type(t->return_type);
-
-    switch (t->kind) {
-        case TY_INT:
-            if (t == ty_int) {
-                #if DEBUG_ALLOCS
-                fprintf(stderr, "skip free int type %p\n", t);
-                #endif
-            } else {
-                #if DEBUG_ALLOCS
-                fprintf(stderr, "free  int   %p\n", t);
-                #endif
-                free(t);
-            }
-            break;
-        case TY_PTR:
-            #if DEBUG_ALLOCS
-            fprintf(stderr, "free  ptrty %p\n", t);
-            #endif
-            free_type(t->base);
-            free(t);
-            break;
-        case TY_FUNC:
-            #if DEBUG_ALLOCS
-            fprintf(stderr, "free  fn ty %p\n", t);
-            #endif
-            free_type(t->base);
-            free(t);
-            break;
-        case TY_ARRAY:
-            #if DEBUG_ALLOCS
-            fprintf(stderr, "free  array %p of %p\n", t, t->base);
-            #endif
-            free_type(t->base);
-            free(t);
-            break;
-        default:
-            // ignore previously freed types
-            break;
-    }
-}
-
 bool is_integer(Type *type) {
     return type->kind == TY_INT;
 }
 
-Type *copy_type(Type *type) {
-    Type *copy = calloc(1, sizeof(Type));
+Type *copy_type(Type *type, MemManager *mm) {
+    Type *copy = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc copy of type %p\n", type);
@@ -62,8 +17,8 @@ Type *copy_type(Type *type) {
     return copy;
 }
 
-Type *pointer_to(Type *base) {
-    Type *type = calloc(1, sizeof(Type));
+Type *pointer_to(Type *base, MemManager *mm) {
+    Type *type = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc ptrty %p\n", type);
@@ -75,8 +30,8 @@ Type *pointer_to(Type *base) {
     return type;
 }
 
-Type *func_type(Type *return_type) {
-    Type *type = calloc(1, sizeof(Type));
+Type *func_type(Type *return_type, MemManager *mm) {
+    Type *type = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc fn ty %p\n", type);
@@ -87,8 +42,8 @@ Type *func_type(Type *return_type) {
     return type;
 }
 
-Type *array_of(Type *base, int len) {
-    Type *type = calloc(1, sizeof(Type));
+Type *array_of(Type *base, int len, MemManager *mm) {
+    Type *type = allocate(mm, sizeof(Type));
 
     #if DEBUG_ALLOCS
     fprintf(stderr, "alloc array %p of %p\n", type, base);
@@ -101,21 +56,21 @@ Type *array_of(Type *base, int len) {
     return type;
 }
 
-void add_type(Node *node) {
+void add_type(Node *node, MemManager *mm) {
     if (!node || node->type) {
         return;
     }
 
-    add_type(node->lhs);
-    add_type(node->rhs);
-    add_type(node->condition);
-    add_type(node->consequence);
-    add_type(node->alternative);
-    add_type(node->initialize);
-    add_type(node->increment);
+    add_type(node->lhs, mm);
+    add_type(node->rhs, mm);
+    add_type(node->condition, mm);
+    add_type(node->consequence, mm);
+    add_type(node->alternative, mm);
+    add_type(node->initialize, mm);
+    add_type(node->increment, mm);
 
     for (Node *n = node->body; n; n = n->next) {
-        add_type(n);
+        add_type(n, mm);
     }
 
     switch (node->kind) {
@@ -145,9 +100,9 @@ void add_type(Node *node) {
         return;
     case ND_ADDR:
         if (node->lhs->type->kind == TY_ARRAY) {
-            node->type = pointer_to(node->lhs->type->base);
+            node->type = pointer_to(node->lhs->type->base, mm);
         } else {
-            node->type = pointer_to(node->lhs->type);
+            node->type = pointer_to(node->lhs->type, mm);
         }
         return;
     case ND_DEREF:
