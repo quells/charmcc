@@ -18,9 +18,9 @@ int main(int argc, char **argv) {
         }
     }
 
-    GC *gc = NULL;
+    GC gc = {NULL, NULL, NULL};
     Token *tok = tokenize(source);
-    Function *prog = parse(tok, gc);
+    Function *prog = parse(tok, &gc);
 
     if (debug) {
         debug_ast(prog);
@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
     }
 
     free_tokens(tok);
-    cleanup(gc);
+    cleanup(&gc);
 
     return 0;
 }

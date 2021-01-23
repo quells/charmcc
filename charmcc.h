@@ -47,6 +47,7 @@ void free_tokens(Token *tok);
 typedef struct GC GC;
 struct GC {
     GC *next;
+    GC *tail;
     void *obj;
 };
 
