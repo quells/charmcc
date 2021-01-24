@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
     MemManager *mm = new_memmanager();
     Token *tok = tokenize(source);
-    Function *prog = parse(tok, mm);
+    Obj *prog = parse(tok, mm);
 
     if (debug) {
         debug_ast(prog);

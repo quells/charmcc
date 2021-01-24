@@ -1,7 +1,7 @@
 #include "charmcc.h"
 
 static int depth;
-static Function *current_fn;
+static Obj *current_fn;
 
 static void gen_expr(Node *node);
 
@@ -190,13 +190,19 @@ static void gen_expr(Node *node) {
     error_tok(node->repr, "invalid expression");
 }
 
-static void assign_lvar_offsets(Function *fn) {
-    int offset = PTR_SIZE;
-    for (Obj *var = fn->locals; var; var = var->next) {
-        offset += var->type->size;
-        var->offset = offset;
+static void assign_lvar_offsets(Obj *prog) {
+    for (Obj *fn = prog; fn; fn = fn->next) {
+        if (!fn->is_function) {
+            continue;
+        }
+
+        int offset = PTR_SIZE;
+        for (Obj *var = fn->locals; var; var = var->next) {
+            offset += var->type->size;
+            var->offset = offset;
+        }
+        fn->stack_size = align_to(offset, 16);
     }
-    fn->stack_size = align_to(offset, 16);
 }
 
 static void gen_stmt(Node *node) {
@@ -312,7 +318,7 @@ static void gen_div(void) {
         "  pop   {fp, pc}\n");
 }
 
-int gen_fn(Function *fn) {
+int gen_fn(Obj *fn) {
     current_fn = fn;
     assign_lvar_offsets(fn);
 
@@ -346,15 +352,19 @@ int gen_fn(Function *fn) {
     return contains(fn->body, ND_DIV);
 }
 
-void codegen(Function *prog) {
+void codegen(Obj *prog) {
     int contains_div = 0;
 
-    for (Function *fn = prog; fn; fn = fn->next) {
-        printf(".global %s\n", fn->name);
+    for (Obj *obj = prog; obj; obj = obj->next) {
+        if (obj->is_function) {
+            printf(".global %s\n", obj->name);
+        }
     }
     printf("\n");
-    for (Function *fn = prog; fn; fn = fn->next) {
-        contains_div = gen_fn(fn);
+    for (Obj *obj = prog; obj; obj = obj->next) {
+        if (obj->is_function) {
+            contains_div += gen_fn(obj);
+        }
     }
 
     if (contains_div) {

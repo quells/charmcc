@@ -138,7 +138,7 @@ static void debug_node(Node *n) {
     error_tok(n->repr, "unhandled node");
 }
 
-void debug_fn(Function *fn) {
+void debug_fn(Obj *fn) {
     if (fn->locals != NULL) {
         printf("%s local variables:", fn->name);
         for (Obj *l = fn->locals; l; l = l->next) {
@@ -152,8 +152,10 @@ void debug_fn(Function *fn) {
     printf("\n");
 }
 
-void debug_ast(Function *prog) {
-    for (Function *fn = prog; fn; fn = fn->next) {
-        debug_fn(fn);
+void debug_ast(Obj *prog) {
+    for (Obj *fn = prog; fn; fn = fn->next) {
+        if (fn->is_function) {
+            debug_fn(fn);
+        }
     }
 }
