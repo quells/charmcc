@@ -1,7 +1,7 @@
 #include "charmcc.h"
 
 static int depth;
-static Function *current_fn;
+static Obj *current_fn;
 
 static void gen_expr(Node *node);
 
@@ -70,7 +70,11 @@ static int contains(Node *node, NodeKind kind) {
 static void gen_addr(Node *node) {
     switch (node->kind) {
     case ND_VAR:
-        printf("  sub   r0, fp, #%d\n", node->var->offset);
+        if (node->var->is_local) {
+            printf("  sub   r0, fp, #%d\n", node->var->offset);
+        } else {
+            printf("  ldr   r0, __addr_%s\n", node->var->name);
+        }
         return;
     case ND_DEREF:
         gen_expr(node->lhs);
@@ -190,13 +194,23 @@ static void gen_expr(Node *node) {
     error_tok(node->repr, "invalid expression");
 }
 
-static void assign_lvar_offsets(Function *fn) {
-    int offset = PTR_SIZE;
-    for (Obj *var = fn->locals; var; var = var->next) {
-        offset += var->type->size;
-        var->offset = offset;
+static int assign_offsets(Obj *prog) {
+    int global_vars = 0;
+    for (Obj *obj = prog; obj; obj = obj->next) {
+        if (!obj->is_function) {
+            global_vars++;
+            continue;
+        }
+
+        Obj *fn = obj;
+        int lvar_offset = PTR_SIZE;
+        for (Obj *var = fn->locals; var; var = var->next) {
+            lvar_offset += var->type->size;
+            var->offset = lvar_offset;
+        }
+        fn->stack_size = align_to(lvar_offset, 16);
     }
-    fn->stack_size = align_to(offset, 16);
+    return global_vars;
 }
 
 static void gen_stmt(Node *node) {
@@ -312,9 +326,8 @@ static void gen_div(void) {
         "  pop   {fp, pc}\n");
 }
 
-int gen_fn(Function *fn) {
+int gen_fn(Obj *fn) {
     current_fn = fn;
-    assign_lvar_offsets(fn);
 
     printf(
         "%s:\n"
@@ -346,18 +359,47 @@ int gen_fn(Function *fn) {
     return contains(fn->body, ND_DIV);
 }
 
-void codegen(Function *prog) {
+void codegen(Obj *prog) {
     int contains_div = 0;
+    int global_vars = assign_offsets(prog);
 
-    for (Function *fn = prog; fn; fn = fn->next) {
-        printf(".global %s\n", fn->name);
+    if (global_vars) {
+        printf(".data\n.balign 4\n\n");
+        for (Obj *obj = prog; obj; obj = obj->next) {
+            if (!obj->is_function) {
+                printf("__global_%s:\n", obj->name);
+                printf("  .word 0\n");
+            }
+        }
+        printf("\n");
+    }
+
+    printf(".text\n.balign 4\n");
+    for (Obj *obj = prog; obj; obj = obj->next) {
+        if (obj->is_function) {
+            printf(".global %s\n", obj->name);
+        }
     }
     printf("\n");
-    for (Function *fn = prog; fn; fn = fn->next) {
-        contains_div = gen_fn(fn);
+    for (Obj *obj = prog; obj; obj = obj->next) {
+        if (obj->is_function) {
+            contains_div += gen_fn(obj);
+        }
     }
 
     if (contains_div) {
         gen_div();
+    }
+
+    if (global_vars) {
+        if (contains_div) {
+            printf("\n");
+        }
+        for (Obj *obj = prog; obj; obj = obj->next) {
+            if (!obj->is_function) {
+                printf("__addr_%s: .word __global_%s\n", obj->name, obj->name);
+            }
+        }
+        printf("\n");
     }
 }

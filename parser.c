@@ -2,6 +2,7 @@
 
 // All local variable instances found during parsing.
 Obj *locals;
+Obj *globals;
 
 static Node *new_node(NodeKind kind, Token *repr, MemManager *mm) {
     Node *node = allocate(mm, sizeof(Node));
@@ -96,7 +97,7 @@ static Node *new_var(Obj *var, Token *repr, MemManager *mm) {
     return node;
 }
 
-static Obj *new_lvar(char *name, Type *type, MemManager *mm) {
+static Obj *new_obj(char *name, Type *type, MemManager *mm) {
     Obj *var = allocate(mm, sizeof(Obj));
 
     #if DEBUG_ALLOCS
@@ -119,8 +120,21 @@ static Obj *new_lvar(char *name, Type *type, MemManager *mm) {
 
     var->name = name;
     var->type = type;
+    return var;
+}
+
+static Obj *new_lvar(char *name, Type *type, MemManager *mm) {
+    Obj *var = new_obj(name, type, mm);
+    var->is_local = true;
     var->next = locals;
     locals = var;
+    return var;
+}
+
+static Obj *new_gvar(char *name, Type *type, MemManager *mm) {
+    Obj *var = new_obj(name, type, mm);
+    var->next = globals;
+    globals = var;
     return var;
 }
 
@@ -153,9 +167,15 @@ static void create_param_lvars(Type *param, MemManager *mm) {
     }
 }
 
-// Find local variable by name.
+// Find variable by name.
 static Obj *find_var(Token *tok) {
     for (Obj *var = locals; var; var = var->next) {
+        if (strlen(var->name) == tok->len &&
+            !strncmp(tok->loc, var->name, tok->len)) {
+            return var;
+        }
+    }
+    for (Obj *var = globals; var; var = var->next) {
         if (strlen(var->name) == tok->len &&
             !strncmp(tok->loc, var->name, tok->len)) {
             return var;
@@ -647,15 +667,14 @@ static Node *primary(Token **rest, Token *tok, MemManager *mm) {
 }
 
 // function-definition :: stmt*
-static Function *function(Token **rest, Token *tok, MemManager *mm) {
-    Type *type = typespec(&tok, tok);
-    type = declarator(&tok, tok, type, mm);
+static Token *function(Token *tok, Type *base_type, MemManager *mm) {
+    Type *type = declarator(&tok, tok, type, mm);
+
+    Obj *fn = new_gvar(get_ident(type->name, mm), type, mm);
+    fn->is_function = true;
 
     locals = NULL;
 
-    Function *fn = allocate(mm, sizeof(Function));
-    fn->name = get_ident(type->name, mm);
-    fn->type = type;
     create_param_lvars(type->params, mm);
     fn->params = locals;
 
@@ -664,19 +683,46 @@ static Function *function(Token **rest, Token *tok, MemManager *mm) {
     #endif
 
     tok = skip(tok, "{");
-    fn->body = compound_stmt(rest, tok, mm);
+    fn->body = compound_stmt(&tok, tok, mm);
     fn->locals = locals;
-    return fn;
+    return tok;
 }
 
-// program :: function-definition*
-Function *parse(Token *tok, MemManager *mm) {
-    Function head = {};
-    Function *cur = &head;
+static Token *global_variable(Token *tok, Type *base_type, MemManager *mm) {
+    bool first = true;
+    while (!consume(&tok, tok, ";")) {
+        if (!first) {
+            tok = skip(tok, ",");
+        }
+        first = false;
+
+        Type *type = declarator(&tok, tok, base_type, mm);
+        new_gvar(get_ident(type->name, mm), type, mm);
+    }
+    return tok;
+}
+
+static bool is_function(Token *tok, MemManager *mm) {
+    if (equal(tok, ";")) return false;
+
+    Type dummy = {};
+    Type *type = declarator(&tok, tok, &dummy, mm);
+    return type->kind == TY_FUNC;
+}
+
+// program :: (function-definition | global-variable)*
+Obj *parse(Token *tok, MemManager *mm) {
+    globals = NULL;
 
     while (tok->kind != TK_EOF) {
-        cur = cur->next = function(&tok, tok, mm);
+        Type *base_type = typespec(&tok, tok);
+
+        if (is_function(tok, mm)) {
+            tok = function(tok, base_type, mm);
+        } else {
+            tok = global_variable(tok, base_type, mm);
+        }
     }
 
-    return head.next;
+    return globals;
 }

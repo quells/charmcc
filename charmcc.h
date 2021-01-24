@@ -88,21 +88,20 @@ typedef enum {
 typedef struct Type Type;
 typedef struct Node Node;
 
-// Local variable
+// Variable or function
 typedef struct Obj Obj;
 struct Obj {
     Obj *next;
     char *name;
     Type *type;
-    int offset; // Offset from frame pointer
-};
+    bool is_local;
+    bool is_function;
 
-typedef struct Function Function;
-struct Function {
-    Function *next;
-    char *name;
+    // Variable
+    int offset; // Offset from frame pointer
+
+    // Function
     Obj *params;
-    Type *type;
     Node *body;
     Obj *locals;
     int stack_size;
@@ -133,7 +132,7 @@ struct Node {
     int val;    // Only if kind == ND_NUM
 };
 
-Function *parse(Token *tok, MemManager *mm);
+Obj *parse(Token *tok, MemManager *mm);
 
 /*----------
 Type Checker
@@ -179,6 +178,6 @@ void add_type(Node *node, MemManager *mm);
 == Code Gen ==
 ------------*/
 
-void codegen(Function *prog);
+void codegen(Obj *prog);
 
-void debug_ast(Function *prog);
+void debug_ast(Obj *prog);
