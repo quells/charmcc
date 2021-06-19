@@ -1,5 +1,11 @@
 #include "charmcc.h"
 
+IRInstruction *new_inst(IRKind kind) {
+    IRInstruction *inst = calloc(1, sizeof(IRInstruction));
+    inst->kind = kind;
+    return inst;
+}
+
 static int depth;
 static Obj *current_fn;
 
@@ -326,80 +332,104 @@ static void gen_div(void) {
         "  pop   {fp, pc}\n");
 }
 
-int gen_fn(Obj *fn) {
+IRInstruction *gen_fn(Obj *fn) {
     current_fn = fn;
+    IRInstruction head = {};
+    IRInstruction *cur = &head;
 
-    printf(
-        "%s:\n"
-        "  push  {fp, lr}\n"
-        "  add   fp, sp, #4\n"
-        "  sub   sp, sp, #%d\n",
-        fn->name,
-        fn->stack_size);
+    cur = cur->next = new_inst(IR_LABEL);
+    cur->target = fn->name;
 
-    if (fn->params) {
-        // Save passed-by-register arguments to stack
-        // str   r0, [fp, #-8]
-        int i = 0;
-        for (Obj *var = fn->params; var; var = var->next) {
-            assert(i < 4);
-            printf("  str   r%d, [fp, #-%d]\n", i++, var->offset);
-        }
+    cur = cur->next = new_inst(IR_PROLOGUE);
+
+    if (fn->stack_size > 0) {
+        cur = cur->next = new_inst(IR_ALLOC);
+        cur->imm = fn->stack_size;
     }
 
-    gen_stmt(fn->body);
-    assert(depth == 0);
+    cur = cur->next = new_inst(IR_LABEL);
+    cur->target = malloc((strlen(fn->name) + 8) * sizeof(char));
+    sprintf(cur->target, "%s.return", fn->name);
 
-    printf(
-        "%s.return:\n"
-        "  sub   sp, fp, #4\n"
-        "  pop   {fp, pc}\n\n",
-        fn->name);
+    cur = cur->next = new_inst(IR_EPILOGUE);
+    cur = cur->next = new_inst(IR_RETURN);
+
+    return head.next;
+
+    // printf(
+    //     "%s:\n"
+    //     "  push  {fp, lr}\n"
+    //     "  add   fp, sp, #4\n"
+    //     "  sub   sp, sp, #%d\n",
+    //     fn->name,
+    //     fn->stack_size);
+
+    // if (fn->params) {
+    //     // Save passed-by-register arguments to stack
+    //     // str   r0, [fp, #-8]
+    //     int i = 0;
+    //     for (Obj *var = fn->params; var; var = var->next) {
+    //         assert(i < 4);
+    //         printf("  str   r%d, [fp, #-%d]\n", i++, var->offset);
+    //     }
+    // }
+
+    // gen_stmt(fn->body);
+    // assert(depth == 0);
+
+    // printf(
+    //     "%s.return:\n"
+    //     "  sub   sp, fp, #4\n"
+    //     "  pop   {fp, pc}\n\n",
+    //     fn->name);
     
-    return contains(fn->body, ND_DIV);
+    // return contains(fn->body, ND_DIV);
 }
 
-void codegen(Obj *prog) {
-    int contains_div = 0;
-    int global_vars = assign_offsets(prog);
+// Create a linked list of intermediate representation instructions from AST.
+IR *codegen_ir(Obj *ast) {
+    IR *prog = calloc(1, sizeof(IR));
+    
+    IRInstruction head = {};
+    IRInstruction *cur = &head;
 
-    if (global_vars) {
-        printf(".data\n.balign 4\n\n");
-        for (Obj *obj = prog; obj; obj = obj->next) {
+    // Declare global variables
+    int has_global_vars = assign_offsets(ast);
+    if (has_global_vars) {
+        for (Obj *obj = ast; obj; obj = obj->next) {
             if (!obj->is_function) {
-                printf("__global_%s:\n", obj->name);
-                printf("  .word 0\n");
+                prog->vars = append_str(prog->vars, obj->name);
             }
         }
-        printf("\n");
     }
 
-    printf(".text\n.balign 4\n");
-    for (Obj *obj = prog; obj; obj = obj->next) {
+    // Declare functions
+    for (Obj *obj = ast; obj; obj = obj->next) {
         if (obj->is_function) {
-            printf(".global %s\n", obj->name);
+            prog->funcs = append_str(prog->funcs, obj->name);
         }
     }
-    printf("\n");
-    for (Obj *obj = prog; obj; obj = obj->next) {
+
+    // Generate functions
+    for (Obj *obj = ast; obj; obj = obj->next) {
         if (obj->is_function) {
-            contains_div += gen_fn(obj);
+            cur = cur->next = gen_fn(obj);
         }
     }
 
-    if (contains_div) {
-        gen_div();
-    }
+    prog->instructions = head.next;
+    return prog;
+}
 
-    if (global_vars) {
-        if (contains_div) {
-            printf("\n");
-        }
-        for (Obj *obj = prog; obj; obj = obj->next) {
-            if (!obj->is_function) {
-                printf("__addr_%s: .word __global_%s\n", obj->name, obj->name);
-            }
-        }
-        printf("\n");
-    }
+void free_ir_instruction(IRInstruction *inst) {
+    if (inst == NULL) return;
+    free_ir_instruction(inst->next);
+    free(inst);
+}
+
+void free_ir(IR *prog) {
+    free_string_list(prog->vars);
+    free_string_list(prog->funcs);
+    free_ir_instruction(prog->instructions);
+    free(prog);
 }

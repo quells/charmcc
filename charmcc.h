@@ -10,6 +10,39 @@
 #define PTR_SIZE 4
 #define DEBUG_ALLOCS 0
 
+// A linked list where the head keeps track of the tail for fast append.
+typedef struct StringList StringList;
+struct StringList {
+    StringList *next;
+    StringList *tail;
+    char *s;
+};
+
+static StringList *append_str(StringList *head, char *str) {
+    StringList *next = calloc(1, sizeof(StringList));
+    next->s = str;
+
+    if (head == NULL) {
+        head = next;
+        return head;
+    }
+
+    if (head->tail == NULL) {
+        head->next = next;
+    } else {
+        head->tail->next = next;
+    }
+    head->tail = next;
+
+    return head;
+}
+
+static void free_string_list(StringList *list) {
+    if (list == NULL) return;
+    free_string_list(list->next);
+    free(list);
+}
+
 /*---------
 == Lexer ==
 ---------*/
@@ -178,6 +211,57 @@ void add_type(Node *node, MemManager *mm);
 == Code Gen ==
 ------------*/
 
-void codegen(Obj *prog);
+typedef enum {
+    IR_LABEL,
+
+    IR_ALLOC,
+    IR_STORE,
+    IR_LOAD,
+    IR_ASSIGN,
+    IR_PUSH,
+    IR_POP,
+    IR_PROLOGUE,
+    IR_EPILOGUE,
+    IR_RETURN,
+
+    IR_NEG,
+    IR_ADD,
+    IR_SUB,
+    IR_MUL,
+    IR_DIV,
+
+    IR_CMP,
+    IR_EQ,
+    IR_NEQ,
+    IR_LT,
+    IR_LTE,
+
+    IR_BRANCH,
+    IR_BRANCH_EQ,
+    IR_BRANCH_NEQ,
+    IR_BRANCH_LT,
+    IR_BRANCH_LTE
+} IRKind;
+
+typedef struct IRInstruction IRInstruction;
+struct IRInstruction {
+    IRKind kind;
+    IRInstruction *next;
+
+    char *target;
+    int r, a, b, imm;
+};
+
+typedef struct IR IR;
+struct IR {
+    StringList *vars;
+    StringList *funcs;
+    IRInstruction *instructions;
+};
+
+IR *codegen_ir(Obj *prog);
+void codegen_32(IR *prog);
+void free_ir(IR *prog);
 
 void debug_ast(Obj *prog);
+void debug_ir(IR *prog);

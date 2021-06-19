@@ -1,0 +1,33 @@
+Intermediate Representation Syntax (ish)
+
+all registers are 32-bits
+
+global fn  foo ; declare global function foo
+global var x   ; declare global variable x
+
+alloc  x     ; allocate at least x bytes on stack
+store  r imm ; store r in stack at immediate offset
+load   r imm ; load r from stack at immediate offset
+assign r imm ; set r to immediate value
+push   r     ; push r onto stack
+pop    r     ; pop r off of stack
+prologue     ;      set up subroutine
+epilogue     ;    clean up subroutine
+return       ; return from subroutine
+
+neg dst     ; dst = -dst
+add dst a b ; dst = a + b
+sub dst a b ; dst = a - b
+mul dst a b ; dst = a * b
+div dst a b ; dst = a / b
+
+cmp a b ; set comparison flags
+eq  a   ; set a to 1 if eq flag set, otherwise 0
+ne  a   ; set a to 0 if eq flag set, otherwise 1
+lt  a   ; set a to 1 if lt flag set, otherwise 0
+le  a   ; set a to 1 if le flag set, otherwise 0
+
+b label   ; branch to label
+bl label  ; branch to label if l flag set
+ble label ; branch to label if le flag set
+beq label ; branch to label if eq flag set

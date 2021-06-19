@@ -159,3 +159,99 @@ void debug_ast(Obj *prog) {
         }
     }
 }
+
+void debug_ir(IR *prog) {
+    int globals = 0;
+    for (StringList *str = prog->vars; str; str = str->next) {
+        printf(".global var %s\n", str->s);
+        globals++;
+    }
+    for (StringList *str = prog->funcs; str; str = str->next) {
+        printf(".global fn %s\n", str->s);
+        globals++;
+    }
+
+    for (IRInstruction *inst = prog->instructions; inst; inst = inst->next) {
+        switch (inst->kind) {
+        case IR_LABEL:
+            printf("%s:\n", inst->target);
+            break;
+
+        case IR_ALLOC:
+            printf("  alloc %d\n", inst->imm);
+            break;
+        case IR_STORE:
+            printf("  store r%d [#%d]\n", inst->r, inst->imm);
+            break;
+        case IR_LOAD:
+            printf("  load r%d [#%d]\n", inst->r, inst->imm);
+            break;
+        case IR_ASSIGN:
+            printf("  assign r%d #%d\n", inst->r, inst->imm);
+            break;
+        case IR_PUSH:
+            printf("  push r%d\n", inst->r);
+            break;
+        case IR_POP:
+            printf("  pop r%d\n", inst->r);
+            break;
+        case IR_PROLOGUE:
+            printf("  prologue\n");
+            break;
+        case IR_EPILOGUE:
+            printf("  epilogue\n");
+            break;
+        case IR_RETURN:
+            printf("  return\n");
+            break;
+
+        case IR_NEG:
+            printf("  r%d <- -r%d\n", inst->r, inst->r);
+            break;
+        case IR_ADD:
+            printf("  r%d <- r%d + r%d\n", inst->r, inst->a, inst->b);
+            break;
+        case IR_SUB:
+            printf("  r%d <- r%d - r%d\n", inst->r, inst->a, inst->b);
+            break;
+        case IR_MUL:
+            printf("  r%d <- r%d * r%d\n", inst->r, inst->a, inst->b);
+            break;
+        case IR_DIV:
+            printf("  r%d <- r%d / r%d\n", inst->r, inst->a, inst->b);
+            break;
+
+        case IR_CMP:
+            printf("  cmp r%d, r%d\n", inst->a, inst->b);
+            break;
+        case IR_EQ:
+            printf("  r%d <- eq ? 1 : 0\n", inst->r);
+            break;
+        case IR_NEQ:
+            printf("  r%d <- eq ? 0 : 1\n", inst->r);
+            break;
+        case IR_LT:
+            printf("  r%d <- lt ? 1 : 0\n", inst->r);
+            break;
+        case IR_LTE:
+            printf("  r%d <- lte ? 1 : 0\n", inst->r);
+            break;
+
+        case IR_BRANCH:
+            printf("  b %s\n", inst->target);
+            break;
+        case IR_BRANCH_EQ:
+            printf("  beq %s\n", inst->target);
+            break;
+        case IR_BRANCH_NEQ:
+            printf("  bne %s\n", inst->target);
+            break;
+        case IR_BRANCH_LT:
+            printf("  bl %s\n", inst->target);
+            break;
+        case IR_BRANCH_LTE:
+            printf("  ble %s\n", inst->target);
+            break;
+        }
+    }
+}

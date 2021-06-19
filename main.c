@@ -21,13 +21,17 @@ int main(int argc, char **argv) {
     MemManager *mm = new_memmanager();
     Token *tok = tokenize(source);
     Obj *prog = parse(tok, mm);
+    IR *inst = codegen_ir(prog);
 
     if (debug) {
         debug_ast(prog);
+        printf("\n");
+        debug_ir(inst);
     } else {
-        codegen(prog);
+        codegen_32(inst);
     }
 
+    free_ir(inst);
     free_tokens(tok);
     cleanup(mm);
 
